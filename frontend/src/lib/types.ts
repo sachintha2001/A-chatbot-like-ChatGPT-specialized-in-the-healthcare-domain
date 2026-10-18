@@ -250,3 +250,68 @@ export interface PathologyDetailItem {
   };
 }
 
+export type BiomarkerStatus = "NORMAL" | "ELEVATED" | "DECREASED" | "CRITICAL_HIGH" | "CRITICAL_LOW" | "POSITIVE" | "NEGATIVE";
+
+export interface ReportBiomarkerParam {
+  canonical_id: string;
+  display_name_en: string;
+  display_name_si: string;
+  category: string;
+  raw_value: string;
+  numeric_value: number | null;
+  unit: string;
+  ref_interval?: string;
+  status: BiomarkerStatus;
+  status_si: string;
+  is_qualitative: boolean;
+  is_abnormal: boolean;
+  is_critical: boolean;
+  interpretation_en: string;
+  interpretation_si: string;
+  related_icd11: string[];
+}
+
+export interface CorrelatedConditionItem {
+  condition: string;
+  condition_si: string;
+  icd11: string;
+  evidence: string;
+  evidence_si: string;
+  urgency: string;
+}
+
+export interface ReportAnalysisResult {
+  success: boolean;
+  overall_status: "ALL_NORMAL" | "ABNORMAL_ELEVATED_RISK" | "CRITICAL_EMERGENCY";
+  overall_status_en: string;
+  overall_status_si: string;
+  qualitative_verdict: "POSITIVE" | "NEGATIVE" | "NOT_APPLICABLE";
+  is_emergency: boolean;
+  total_parameters_tested: number;
+  abnormal_count: number;
+  elevated_count: number;
+  decreased_count: number;
+  elevated_parameters_en: string[];
+  elevated_parameters_si: string[];
+  decreased_parameters_en: string[];
+  decreased_parameters_si: string[];
+  critical_parameters: string[];
+  parameters: ReportBiomarkerParam[];
+  correlated_conditions: CorrelatedConditionItem[];
+  recommended_specialists: string[];
+  clinical_directives_en: string[];
+  clinical_directives_si: string[];
+  filename?: string;
+  extracted_text_preview?: string;
+  message_en?: string;
+  message_si?: string;
+}
+
+export interface SampleReportItem {
+  id: string;
+  title_en: string;
+  title_si: string;
+  sample_text: string;
+}
+
+

@@ -346,3 +346,62 @@ export async function streamClinicalChat(
   }
 }
 
+export async function uploadMedicalReportFile(
+  file: File,
+  params?: {
+    patientAgeGroup?: string;
+    biologicalSex?: string;
+    language?: string;
+  }
+): Promise<any> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (params?.patientAgeGroup) formData.append("patient_age_group", params.patientAgeGroup);
+  if (params?.biologicalSex) formData.append("biological_sex", params.biologicalSex);
+  if (params?.language) formData.append("language", params.language);
+
+  const res = await fetch(`${API_BASE}/reports/upload`, {
+    method: "POST",
+    body: formData
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "File upload analysis failed" }));
+    throw new Error(errorData.detail || "Medical report analysis failed");
+  }
+  return res.json();
+}
+
+export async function analyzeReportText(
+  text: string,
+  params?: {
+    patientAgeGroup?: string;
+    biologicalSex?: string;
+    language?: string;
+  }
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/reports/analyze-text`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      report_text: text,
+      patient_age_group: params?.patientAgeGroup || "ADULT",
+      biological_sex: params?.biologicalSex || "UNSPECIFIED",
+      language: params?.language || "en"
+    })
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Text analysis failed" }));
+    throw new Error(errorData.detail || "Failed to analyze report text");
+  }
+  return res.json();
+}
+
+export async function fetchSampleReports(): Promise<{ samples: any[] }> {
+  const res = await fetch(`${API_BASE}/reports/samples`);
+  if (!res.ok) throw new Error("Failed to fetch sample clinical reports");
+  return res.json();
+}
+
+
