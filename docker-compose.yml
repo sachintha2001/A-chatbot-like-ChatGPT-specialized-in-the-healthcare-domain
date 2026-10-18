@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: medguard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medguard_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medguard_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-medguard_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medguard_user -d medguard_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medguard-internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medguard-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-medguard_user}:${POSTGRES_PASSWORD:-medguard_secret}@postgres:5432/${POSTGRES_DB:-medguard_db}
+      - SECRET_KEY=${SECRET_KEY:-clinical_decision_support_secure_key_change_in_production_32chars}
+      - AUDIT_LOG_STORAGE_PATH=/app/data/audit_logs/hipaa_audit.jsonl
+      - VECTOR_STORE_PATH=/app/data/vector_store
+      - BACKEND_CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_audit_logs:/app/data/audit_logs
+      - backend_vector_store:/app/data/vector_store
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - medguard-internal
+      - medguard-edge
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medguard-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    networks:
+      - medguard-edge
+
+volumes:
+  postgres_data:
+  backend_audit_logs:
+  backend_vector_store:
+
+networks:
+  medguard-internal:
+    internal: true
+  medguard-edge:

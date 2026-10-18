@@ -1,0 +1,60 @@
+# Environment & Local Secrets
+.env
+.env.local
+*.env
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+!frontend/src/lib/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Database & Local Storage
+*.sqlite3
+*.db
+backend/data/vector_store/
+backend/data/audit_logs/
+data/audit_logs/
+data/vector_store/
+data/test_vectors/
+*.npy
+
+# IDE & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,27 @@
+{
+  "guideline_id": "GUIDE-ENDO-005",
+  "source_title": "ADA Standards of Care in Diabetes: Glycemic Targets and Hypoglycemia Management",
+  "issuing_authority": "American Diabetes Association (ADA)",
+  "clinical_domain": "Endocrinology",
+  "evidence_level": "Level I (Annual Clinical Practice Recommendations)",
+  "publication_year": 2024,
+  "source_url": "https://diabetesjournals.org/care/issue/47/Supplement_1",
+  "icd10_codes": ["E11.649", "E16.2"],
+  "mesh_terms": ["Hypoglycemia", "Diabetes Mellitus Type 2", "Glucagon", "Neuroglycopenia", "Rule of 15"],
+  "chunks": [
+    {
+      "chunk_id": "GUIDE-ENDO-005-C1",
+      "section_header": "Hypoglycemia Classification and the Rule of 15",
+      "text_content": "Hypoglycemia is classified into three levels: Level 1 (Glucose <70 mg/dL [3.9 mmol/L] and >=54 mg/dL [3.0 mmol/L]): Alert value requiring treatment with the 'Rule of 15'—ingest 15 grams of fast-acting carbohydrate (e.g., 4 oz fruit juice, 3-4 glucose tablets, or 1/2 can regular soda), recheck capillary blood glucose in 15 minutes, and repeat until glucose is >=70 mg/dL. Once normalized, consume a meal or snack containing complex carbohydrates and protein to prevent recurrence. Autonomic symptoms include tremor, palpitations, diaphoresis, and acute hunger.",
+      "triage_urgency": "ROUTINE",
+      "keywords": ["hypoglycemia", "low blood sugar", "rule of 15", "glucose tablets", "shakiness", "palpitations", "sweating", "diabetic emergency"]
+    },
+    {
+      "chunk_id": "GUIDE-ENDO-005-C2",
+      "section_header": "Severe Hypoglycemia (Level 3) and Emergency Glucagon Administration",
+      "text_content": "Level 3 Hypoglycemia is a severe medical emergency defined as severe cognitive impairment requiring third-party assistance for recovery, irrespective of specific numerical glucose level. Signs of neuroglycopenia include disorientation, violent confusion, combative behavior, seizure, or loss of consciousness/coma. Immediate management: Do not administer oral liquids/solids due to aspiration hazard. Administer emergency glucagon (nasal Baqsimi 3mg or subcutaneous/intramuscular glucagon 1mg) and summon emergency medical personnel (911/999/112) immediately. Place the patient in the lateral recovery position.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["severe hypoglycemia", "neuroglycopenia", "unconscious diabetic", "seizure", "glucagon", "baqsimi", "coma", "low sugar emergency"]
+    }
+  ]
+}

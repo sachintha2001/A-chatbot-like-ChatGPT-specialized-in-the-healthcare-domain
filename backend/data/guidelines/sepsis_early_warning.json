@@ -1,0 +1,27 @@
+{
+  "guideline_id": "GUIDE-INF-003",
+  "source_title": "Surviving Sepsis Campaign International Guidelines: Management of Sepsis and Septic Shock",
+  "issuing_authority": "Surviving Sepsis Campaign & Society of Critical Care Medicine",
+  "clinical_domain": "Infectious Disease",
+  "evidence_level": "Level I (International Consensus & Multi-Center Trials)",
+  "publication_year": 2023,
+  "source_url": "https://www.sccm.org/SurvivingSepsisCampaign/Guidelines",
+  "icd10_codes": ["A41.9", "R65.20", "R65.21"],
+  "mesh_terms": ["Sepsis", "Septic Shock", "qSOFA", "Systemic Inflammatory Response Syndrome", "Lactate"],
+  "chunks": [
+    {
+      "chunk_id": "GUIDE-INF-003-C1",
+      "section_header": "qSOFA Bedside Triage and Sepsis Red Flags",
+      "text_content": "In non-ICU and outpatient settings, the quick Sequential Organ Failure Assessment (qSOFA) identifies adult patients with suspected infection at elevated risk of in-hospital mortality. A score of >=2 out of 3 criteria warrants immediate emergency escalation: (1) Altered mental status (Glasgow Coma Scale <15 or new confusion/somnolence), (2) Systolic blood pressure <=100 mmHg, and (3) Respiratory rate >=22 breaths per minute. Additional red flags include non-blanching purpuric skin rash, persistent anuria (>12 hours without urination), mottling of extremities, and profound rigors with hypothermia (<36.0 C / 96.8 F) or hyperpyrexia (>38.5 C / 101.3 F).",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["sepsis", "qsofa", "infection", "confusion", "low blood pressure", "rapid breathing", "shivering", "fever", "hypothermia", "anuria", "mottled skin"]
+    },
+    {
+      "chunk_id": "GUIDE-INF-003-C2",
+      "section_header": "Hour-1 Bundle Intervention Requirements",
+      "text_content": "The SSC 1-Hour Bundle stipulates immediate initiation upon recognition of sepsis or septic shock: (1) Measure blood lactate level (remeasure if initial lactate >2 mmol/L), (2) Obtain blood cultures prior to administering broad-spectrum antimicrobials, (3) Administer empirical broad-spectrum intravenous antibiotics, (4) Rapidly administer 30 mL/kg crystalloid fluid for hypotension or lactate >=4 mmol/L, and (5) Initiate vasopressors (norepinephrine first-line) if patient remains hypotensive during or after fluid resuscitation to maintain mean arterial pressure (MAP) >=65 mmHg.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["hour-1 bundle", "lactate", "blood cultures", "intravenous antibiotics", "crystalloids", "vasopressors", "norepinephrine", "septic shock"]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "guideline_id": "GUIDE-CARD-001",
+  "source_title": "AHA/ACC & NICE Clinical Guideline CG95: Assessment and Diagnosis of Recent-Onset Chest Pain or Discomfort",
+  "issuing_authority": "AHA/ACC and NICE",
+  "clinical_domain": "Cardiology",
+  "evidence_level": "Level I (Randomized Controlled Trials & Meta-Analyses)",
+  "publication_year": 2023,
+  "source_url": "https://www.nice.org.uk/guidance/cg95",
+  "icd10_codes": ["I20.0", "I21.9", "R07.9"],
+  "mesh_terms": ["Acute Coronary Syndrome", "Myocardial Infarction", "Chest Pain", "Triage"],
+  "chunks": [
+    {
+      "chunk_id": "GUIDE-CARD-001-C1",
+      "section_header": "Immediate Red-Flag Symptoms for Suspected Acute Coronary Syndrome",
+      "text_content": "Immediate emergency medical services (911/999/112) must be activated if chest pain or tightness is accompanied by any of the following high-risk features: radiation of discomfort to the left arm, neck, jaw, back, or epigastrium; associated diaphoresis (unexplained cold sweating), dyspnea (shortness of breath), lightheadedness, syncope, or presyncope; nausea or vomiting in the presence of retrosternal pressure; or sudden-onset crushing chest pressure lasting longer than 15 minutes. In patients with known coronary artery disease, failure of sublingual nitroglycerin to relieve angina after one dose within 5 minutes warrants immediate emergency response.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["chest pain", "pressure", "radiating pain", "jaw pain", "arm pain", "diaphoresis", "sweating", "shortness of breath", "heart attack", "stemi", "angina"]
+    },
+    {
+      "chunk_id": "GUIDE-CARD-001-C2",
+      "section_header": "HEART Pathway Risk Stratification for Emergency Departments",
+      "text_content": "The HEART pathway evaluates History (highly suspicious = 2, moderately suspicious = 1, slightly/non-suspicious = 0), ECG findings (significant ST depression = 2, non-specific repolarization = 1, normal = 0), Age (>=65 = 2, 45-64 = 1, <45 = 0), Risk Factors (>=3 risk factors or history of atherosclerotic disease = 2, 1-2 risk factors = 1, no risk factors = 0), and initial Troponin (>=3x normal limit = 2, 1-3x normal limit = 1, normal = 0). A score of 0-3 identifies low-risk candidates for early discharge, while a score of 4 or greater mandates immediate telemetry observation and serial cardiac biomarkers.",
+      "triage_urgency": "URGENT",
+      "keywords": ["heart pathway", "troponin", "risk stratification", "cardiac risk factors", "angina pectoris"]
+    },
+    {
+      "chunk_id": "GUIDE-CARD-001-C3",
+      "section_header": "Atypical Presentations in High-Risk Cohorts",
+      "text_content": "Clinicians and automated triage systems must maintain heightened vigilance for atypical presentations of acute myocardial ischemia in female patients, elderly individuals (>75 years), and patients with long-standing diabetes mellitus with autonomic neuropathy. These cohorts frequently present without overt chest pain, instead exhibiting isolated unexplained dyspnea, extreme sudden fatigue, acute epigastric burning, unexplained nausea, or acute mental status changes. Absence of classic retrosternal pressure must never be used alone to rule out ACS in these populations.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["atypical presentation", "female heart attack", "diabetic neuropathy", "silent ischemia", "epigastric discomfort"]
+    }
+  ]
+}

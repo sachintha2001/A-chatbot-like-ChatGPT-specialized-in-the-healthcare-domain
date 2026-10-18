@@ -1,0 +1,27 @@
+{
+  "guideline_id": "GUIDE-PULM-006",
+  "source_title": "BTS & GOLD Guidelines: Triage and Acute Management of Adult Dyspnea, Asthma, and Pulmonary Embolism",
+  "issuing_authority": "British Thoracic Society & Global Initiative for Chronic Obstructive Lung Disease",
+  "clinical_domain": "Pulmonology",
+  "evidence_level": "Level I (Evidence-Based Clinical Practice Guidelines)",
+  "publication_year": 2023,
+  "source_url": "https://www.brit-thoracic.org.uk/guidelines-and-quality-standards",
+  "icd10_codes": ["R06.02", "J44.1", "J45.901", "I26.99"],
+  "mesh_terms": ["Dyspnea", "Asthma", "COPD Exacerbation", "Pulmonary Embolism", "Stridor", "Triage"],
+  "chunks": [
+    {
+      "chunk_id": "GUIDE-PULM-006-C1",
+      "section_header": "Life-Threatening Respiratory Red Flags and Airway Obstruction",
+      "text_content": "Any acute breathlessness accompanied by the following features mandates immediate emergency dispatch: Inspiratory stridor (high-pitched harsh breathing signaling upper airway compromise); inability to speak in complete phrases (sentence dyspnea); cyanosis (blue lips or tongue indicating SpO2 <85%); accessory muscle use with tracheal tug; silent chest on auscultation in severe bronchospasm; or acute hemoptysis accompanied by pleuritic chest pain and unilateral calf swelling (Wells score criteria indicating high clinical probability of Pulmonary Embolism).",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["shortness of breath", "dyspnea", "stridor", "cyanosis", "pulmonary embolism", "calf swelling", "pleuritic pain", "silent chest", "asthma attack"]
+    },
+    {
+      "chunk_id": "GUIDE-PULM-006-C2",
+      "section_header": "Acute Exacerbation of Asthma and COPD Stratification",
+      "text_content": "Severe acute asthma exacerbation is defined by PEFR (Peak Expiratory Flow Rate) 33-50% predicted, respiratory rate >=25 breaths/min, heart rate >=110 bpm, and inability to complete sentences. Moderate exacerbation exhibits PEFR 50-75% with stable vital signs. Immediate management: Inhaled short-acting beta-2 agonist (SABA, e.g. salbutamol/albuterol 4-10 puffs via spacer every 20 minutes) alongside systemic oral corticosteroids (prednisolone 40-50mg). Failure to achieve clinical improvement within 15-30 minutes mandates hospital transfer.",
+      "triage_urgency": "URGENT",
+      "keywords": ["asthma exacerbation", "copd flare", "salbutamol", "albuterol", "inhaler", "peak flow", "wheezing", "prednisolone"]
+    }
+  ]
+}

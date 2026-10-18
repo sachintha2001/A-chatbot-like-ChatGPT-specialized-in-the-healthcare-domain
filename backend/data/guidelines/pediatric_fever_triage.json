@@ -1,0 +1,27 @@
+{
+  "guideline_id": "GUIDE-PED-004",
+  "source_title": "NICE Clinical Guideline NG143: Fever in Under 5s - Assessment and Initial Management",
+  "issuing_authority": "National Institute for Health and Care Excellence (NICE UK)",
+  "clinical_domain": "Pediatrics",
+  "evidence_level": "Level I (Comprehensive National Health Guideline)",
+  "publication_year": 2023,
+  "source_url": "https://www.nice.org.uk/guidance/ng143",
+  "icd10_codes": ["R50.9", "A49.9"],
+  "mesh_terms": ["Pediatric Fever", "Infant", "Traffic Light System", "Bacteremia", "Meningitis"],
+  "chunks": [
+    {
+      "chunk_id": "GUIDE-PED-004-C1",
+      "section_header": "NICE Traffic Light Red Group (High Risk - Immediate Emergency Triage)",
+      "text_content": "A febrile child under 5 years presenting with ANY red-group feature mandates immediate emergency department transfer: Color (pale, mottled, ashen, or cyanotic); Activity (unresponsive, does not wake or cannot stay awake if woken, weak high-pitched or continuous cry); Respiratory (tachypnea >60 breaths/min in infant <2mo, >50 in 2-11mo, grunting, chest indrawing); Hydration (reduced skin turgor); and Other critical features: fever >=38.0 C in infant under 3 months, fever >=39.0 C in infant 3-6 months, non-blanching petechial rash (meningococcal disease marker), bulging fontanelle, neck stiffness, status epilepticus, or focal neurological signs.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["pediatric fever", "infant fever", "nice traffic light", "non-blanching rash", "petechiae", "grunting", "bulging fontanelle", "unresponsive baby", "meningitis"]
+    },
+    {
+      "chunk_id": "GUIDE-PED-004-C2",
+      "section_header": "NICE Traffic Light Amber and Green Groups (Intermediate and Low Risk)",
+      "text_content": "Amber (Intermediate Risk - Urgent same-day physician evaluation): Pallor reported by parent, not smiling, awake but decreased activity, tachypnea (>40 breaths/min 12-24mo, >30 in >=2yo), dry mucous membranes, capillary refill time >=3 seconds, fever lasting >=5 days, or new swelling of a limb or joint. Green (Low Risk - Home care with safety netting): Normal skin and eye color, responds normally to social cues, smiles, strong normal cry, moist mucous membranes, normal skin turgor. Advise parents never to use aspirin in under 16s due to Reye syndrome risk, and maintain appropriate oral hydration.",
+      "triage_urgency": "URGENT",
+      "keywords": ["amber flag", "green flag", "dehydration", "fever management", "reye syndrome", "paracetamol", "ibuprofen"]
+    }
+  ]
+}

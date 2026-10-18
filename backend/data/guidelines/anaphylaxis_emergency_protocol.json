@@ -1,0 +1,27 @@
+{
+  "guideline_id": "GUIDE-IMM-007",
+  "source_title": "WAO & Resuscitation Council UK: Anaphylaxis Recognition, Intramuscular Epinephrine Delivery, and Post-Event Monitoring",
+  "issuing_authority": "World Allergy Organization (WAO) & Resuscitation Council UK",
+  "clinical_domain": "Immunology & Emergency Medicine",
+  "evidence_level": "Level I (International Consensus & Resuscitation Guidelines)",
+  "publication_year": 2023,
+  "source_url": "https://www.resus.org.uk/library/additional-guidance/guidance-anaphylaxis",
+  "icd10_codes": ["T78.2XXA", "T88.6XXA"],
+  "mesh_terms": ["Anaphylaxis", "Epinephrine", "Adrenaline", "Angioedema", "Airway Obstruction"],
+  "chunks": [
+    {
+      "chunk_id": "GUIDE-IMM-007-C1",
+      "section_header": "Anaphylaxis Diagnostic Criteria and Immediate Intramuscular Adrenaline",
+      "text_content": "Anaphylaxis is an acute, life-threatening systemic hypersensitivity reaction characterized by rapid onset of airway, breathing, or circulation problems usually associated with skin or mucosal changes. Diagnostic criteria: Acute onset of illness (minutes to several hours) with involvement of skin/mucosal tissue (urticaria, generalized pruritus, swollen lips/tongue/uvula) PLUS at least one of: Respiratory compromise (dyspnea, wheeze, stridor, hypoxemia) OR Reduced blood pressure/end-organ dysfunction (syncope, incontinence, hypotonia). First-line treatment is IMMEDIATE intramuscular injection of epinephrine/adrenaline (1:1000 / 1 mg/mL) into the anterolateral mid-thigh: 0.5 mg in adults, 0.3 mg in children 6-12 years, 0.15 mg in children <6 years. Repeat every 5 minutes if no clinical response.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["anaphylaxis", "epipen", "adrenaline", "epinephrine", "swollen tongue", "swollen throat", "allergic reaction", "peanut allergy", "bee sting", "urticaria"]
+    },
+    {
+      "chunk_id": "GUIDE-IMM-007-C2",
+      "section_header": "Patient Positioning and Biphasic Reaction Vigilance",
+      "text_content": "Crucial clinical pitfall: Do not allow an anaphylaxis patient to stand or walk abruptly; sudden assumption of an upright posture has caused fatal pulseless electrical activity (empty heart syndrome) due to vena cava pooling. Keep the patient supine with lower extremities elevated, or semi-seated if severe respiratory distress predominates. Biphasic reactions (recurrence of anaphylaxis without allergen re-exposure) occur in up to 20% of cases, typically within 4-12 hours; thus, all patients receiving adrenaline must be transported to an emergency department and monitored for a minimum of 6 hours.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["empty heart syndrome", "biphasic reaction", "supine positioning", "emergency observation", "post-anaphylaxis care"]
+    }
+  ]
+}

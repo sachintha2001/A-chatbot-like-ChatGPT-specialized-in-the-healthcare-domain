@@ -1,0 +1,34 @@
+{
+  "guideline_id": "GUIDE-NEUR-002",
+  "source_title": "AHA/ASA & NHS Clinical Protocol: Acute Stroke Identification, FAST Assessment, and Revascularization Time Windows",
+  "issuing_authority": "AHA/ASA and NHS Digital",
+  "clinical_domain": "Neurology",
+  "evidence_level": "Level I (Practice Guidelines & Meta-Analyses)",
+  "publication_year": 2024,
+  "source_url": "https://www.stroke.org/en/about-stroke/stroke-symptoms",
+  "icd10_codes": ["I63.9", "I64", "G45.9"],
+  "mesh_terms": ["Stroke", "Ischemic Stroke", "Tissue Plasminogen Activator", "FAST Criteria", "Triage"],
+  "chunks": [
+    {
+      "chunk_id": "GUIDE-NEUR-002-C1",
+      "section_header": "FAST Protocol and Immediate Hyperacute Action",
+      "text_content": "The validated FAST protocol requires emergency triage action upon detection of any single deficit: Facial drooping (one side of face droops or is numb; uneven smile), Arm weakness (one arm feels numb or weak; drifts downward when held extended), Speech difficulty (slurred words, inability to speak, or comprehension deficit), and Time to call emergency services immediately. Note precisely the 'last known well' (LKW) time, as intravenous thrombolysis (alteplase/tenecteplase) eligibility requires administration within 4.5 hours of symptom onset, and endovascular mechanical thrombectomy is indicated up to 24 hours in large vessel occlusions.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["stroke", "fast", "facial droop", "arm weakness", "slurred speech", "numbness", "paralysis", "last known well", "tpa", "thrombectomy"]
+    },
+    {
+      "chunk_id": "GUIDE-NEUR-002-C2",
+      "section_header": "BE-FAST Extensions and Posterior Circulation Stroke Signs",
+      "text_content": "Posterior circulation strokes may not present with classic anterior hemiparesis. The BE-FAST criteria expand evaluation to include Balance loss (acute ataxia, unexplained sudden vertigo, stumbling) and Eyesight changes (sudden binocular visual loss, hemianopia, or diplopia). In addition, sudden-onset 'thunderclap' headache (reaching maximal intensity within 60 seconds) warrants immediate hyperacute computed tomography to exclude subarachnoid hemorrhage.",
+      "triage_urgency": "EMERGENCY",
+      "keywords": ["be-fast", "balance loss", "vertigo", "vision loss", "diplopia", "thunderclap headache", "subarachnoid hemorrhage"]
+    },
+    {
+      "chunk_id": "GUIDE-NEUR-002-C3",
+      "section_header": "Transient Ischemic Attack (TIA) Risk Stratification via ABCD2 Score",
+      "text_content": "Transient ischemic attacks with full resolution of neurological symptoms remain medical emergencies requiring immediate vascular specialist review within 24 hours. The ABCD2 score stratifies stroke risk: Age >=60 (1 pt), Blood pressure >=140/90 mmHg (1 pt), Clinical features (unilateral weakness = 2 pts, speech disturbance without weakness = 1 pt), Duration of symptoms (>=60 min = 2 pts, 10-59 min = 1 pt), and Diabetes (1 pt). High risk (score 6-7) carries an 8% 2-day stroke risk and warrants inpatient admission.",
+      "triage_urgency": "URGENT",
+      "keywords": ["tia", "transient ischemic attack", "abcd2 score", "mini stroke", "neurological deficit"]
+    }
+  ]
+}
