@@ -140,6 +140,13 @@ async def upload_medical_report(
             biological_sex=biological_sex,
             language=language
         )
+        if not analysis.get("success"):
+            err_msg = analysis.get("message_si") if language == "si" else analysis.get("message_en")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=err_msg or "Unable to extract recognized laboratory biomarker values from the document."
+            )
+
         analysis["filename"] = filename
         analysis["extracted_text_preview"] = extracted_text[:500] + ("..." if len(extracted_text) > 500 else "")
         return analysis
@@ -190,6 +197,13 @@ async def capture_medical_report_image(payload: CameraImageCaptureRequest):
         biological_sex=payload.biological_sex or "UNSPECIFIED",
         language=payload.language or "en"
     )
+    if not analysis.get("success"):
+        err_msg = analysis.get("message_si") if payload.language == "si" else analysis.get("message_en")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=err_msg or "Unable to extract recognized laboratory biomarker values from the captured photo."
+        )
+
     analysis["filename"] = payload.filename or "camera_capture.jpg"
     analysis["extracted_text_preview"] = extracted_text[:500] + ("..." if len(extracted_text) > 500 else "")
     return analysis
@@ -206,6 +220,12 @@ async def analyze_report_text(payload: ReportTextAnalysisRequest):
         biological_sex=payload.biological_sex or "UNSPECIFIED",
         language=payload.language or "en"
     )
+    if not analysis.get("success"):
+        err_msg = analysis.get("message_si") if payload.language == "si" else analysis.get("message_en")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=err_msg or "Unable to extract recognized laboratory biomarker values from the provided text."
+        )
     return analysis
 
 

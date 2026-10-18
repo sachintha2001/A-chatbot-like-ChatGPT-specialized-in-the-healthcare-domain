@@ -203,32 +203,53 @@ export function MedicalReportAnalyzer() {
       if (inputMode === "CAMERA") {
         if (!capturedImage) {
           throw new Error(
-            language === "si"
+            isSi
               ? "කරුණාකර කැමරාවෙන් වෛද්‍ය වාර්තාවේ ඡායාරූපයක් ලබා ගන්න."
               : "Please capture a photo of the laboratory report first."
           );
         }
         const res = await captureMedicalReportImage(capturedImage, { language });
+        if (!res || res.success === false) {
+          throw new Error(
+            isSi
+              ? (res?.message_si || "වාර්තාවෙන් හඳුනාගත හැකි සායනික පරීක්ෂණ අගයන් සොයාගත නොහැකි විය. කරුණාකර වාර්තාවේ පැහැදිලි ඡායාරූපයක් ලබාගන්න.")
+              : (res?.message_en || "No standardized biomarkers could be identified from the photo. Please ensure clear lighting and legible text.")
+          );
+        }
         setAnalysisResult(res);
       } else if (inputMode === "UPLOAD") {
         if (!file) {
           throw new Error(
-            language === "si"
+            isSi
               ? "කරුණාකර විශ්ලේෂණය සඳහා වෛද්‍ය වාර්තා ගොනුවක් (PDF, පින්තූරයක්, TXT) තෝරන්න."
               : "Please select a medical report file (PDF, Image, TXT) to upload."
           );
         }
         const res = await uploadMedicalReportFile(file, { language });
+        if (!res || res.success === false) {
+          throw new Error(
+            isSi
+              ? (res?.message_si || "වාර්තාවෙන් හඳුනාගත හැකි සායනික පරීක්ෂණ අගයන් සොයාගත නොහැකි විය. කරුණාකර වාර්තාවේ පැහැදිලි බව පරීක්ෂා කරන්න.")
+              : (res?.message_en || "No standardized biomarkers could be identified from the document. Please verify the document content.")
+          );
+        }
         setAnalysisResult(res);
       } else {
         if (!reportText.trim()) {
           throw new Error(
-            language === "si"
+            isSi
               ? "කරුණාකර රසායනාගාර වාර්තාවේ විස්තර ඇතුළත් කරන්න."
               : "Please paste or type the laboratory report text."
           );
         }
         const res = await analyzeReportText(reportText, { language });
+        if (!res || res.success === false) {
+          throw new Error(
+            isSi
+              ? (res?.message_si || "වාර්තාවෙන් හඳුනාගත හැකි සායනික පරීක්ෂණ අගයන් සොයාගත නොහැකි විය. කරුණාකර අගයන් පරීක්ෂා කරන්න.")
+              : (res?.message_en || "No standardized biomarkers could be identified from the text. Please check the values.")
+          );
+        }
         setAnalysisResult(res);
       }
     } catch (err: any) {
@@ -615,291 +636,310 @@ export function MedicalReportAnalyzer() {
           </div>
         ) : (
           /* ANALYSIS REPORT RESULT VIEW */
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Overall Status Banner */}
-            <div
-              className={`p-5 rounded-2xl border shadow-xl ${
-                analysisResult.is_emergency
-                  ? "bg-rose-950/80 border-rose-600 text-rose-100"
-                  : analysisResult.overall_status === "ABNORMAL_ELEVATED_RISK"
-                  ? "bg-amber-950/80 border-amber-600 text-amber-100"
-                  : "bg-teal-950/80 border-teal-500 text-teal-100"
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  {analysisResult.is_emergency ? (
-                    <ShieldAlert className="w-7 h-7 text-rose-400 shrink-0 animate-pulse mt-0.5" />
-                  ) : analysisResult.overall_status === "ABNORMAL_ELEVATED_RISK" ? (
-                    <AlertTriangle className="w-7 h-7 text-amber-400 shrink-0 mt-0.5" />
-                  ) : (
-                    <CheckCircle2 className="w-7 h-7 text-teal-400 shrink-0 mt-0.5" />
-                  )}
-                  <div>
-                    <div className="text-xs font-mono font-bold tracking-wider uppercase opacity-80">
-                      {isSi ? "සායනික තක්සේරු තත්ත්වය" : "Overall Diagnostic Classification"}
-                    </div>
-                    <h2 className="text-base sm:text-lg font-bold mt-1">
-                      {isSi ? analysisResult.overall_status_si : analysisResult.overall_status_en}
-                    </h2>
-                    {analysisResult.qualitative_verdict !== "NOT_APPLICABLE" && (
-                      <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-xs uppercase bg-black/40 border border-current">
-                        <span>
-                          {isSi
-                            ? `ප්‍රතිඵලය: ${analysisResult.qualitative_verdict === "POSITIVE" ? "ධනාත්මකයි (POSITIVE)" : "සෘණාත්මකයි (NEGATIVE)"}`
-                            : `Qualitative Result: ${analysisResult.qualitative_verdict}`}
-                        </span>
+          (() => {
+            const isEmergency = Boolean(analysisResult?.is_emergency);
+            const elevatedList = (isSi ? analysisResult?.elevated_parameters_si : analysisResult?.elevated_parameters_en) || [];
+            const decreasedList = (isSi ? analysisResult?.decreased_parameters_si : analysisResult?.decreased_parameters_en) || [];
+            const correlatedList = analysisResult?.correlated_conditions || [];
+            const parametersList = analysisResult?.parameters || [];
+            const specialistsList = analysisResult?.recommended_specialists || [];
+            const directivesList = (isSi ? analysisResult?.clinical_directives_si : analysisResult?.clinical_directives_en) || [];
+            const overallStatus = analysisResult?.overall_status || "UNKNOWN";
+            const overallStatusText = (isSi ? analysisResult?.overall_status_si : analysisResult?.overall_status_en) || (isSi ? "සායනික තක්සේරු තත්ත්වය" : "Clinical Diagnostic Classification");
+            const qualVerdict = analysisResult?.qualitative_verdict || "NOT_APPLICABLE";
+
+            return (
+              <div className="max-w-4xl mx-auto space-y-6">
+                {/* Overall Status Banner */}
+                <div
+                  className={`p-5 rounded-2xl border shadow-xl ${
+                    isEmergency
+                      ? "bg-rose-950/80 border-rose-600 text-rose-100"
+                      : overallStatus === "ABNORMAL_ELEVATED_RISK"
+                      ? "bg-amber-950/80 border-amber-600 text-amber-100"
+                      : "bg-teal-950/80 border-teal-500 text-teal-100"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      {isEmergency ? (
+                        <ShieldAlert className="w-7 h-7 text-rose-400 shrink-0 animate-pulse mt-0.5" />
+                      ) : overallStatus === "ABNORMAL_ELEVATED_RISK" ? (
+                        <AlertTriangle className="w-7 h-7 text-amber-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <CheckCircle2 className="w-7 h-7 text-teal-400 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <div className="text-xs font-mono font-bold tracking-wider uppercase opacity-80">
+                          {isSi ? "සායනික තක්සේරු තත්ත්වය" : "Overall Diagnostic Classification"}
+                        </div>
+                        <h2 className="text-base sm:text-lg font-bold mt-1">
+                          {overallStatusText}
+                        </h2>
+                        {qualVerdict !== "NOT_APPLICABLE" && (
+                          <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-xs uppercase bg-black/40 border border-current">
+                            <span>
+                              {isSi
+                                ? `ප්‍රතිඵලය: ${qualVerdict === "POSITIVE" ? "ධනාත්මකයි (POSITIVE)" : "සෘණාත්මකයි (NEGATIVE)"}`
+                                : `Qualitative Result: ${qualVerdict}`}
+                            </span>
+                          </div>
+                        )}
                       </div>
+                    </div>
+
+                    {isEmergency && (
+                      <a
+                        href="tel:1990"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg transition-colors shrink-0"
+                      >
+                        <PhoneCall className="w-4 h-4" />
+                        <span>{isSi ? "1990 සුවසැරිය / 911 අමතන්න" : "Emergency Direct Dial"}</span>
+                      </a>
                     )}
                   </div>
                 </div>
 
-                {analysisResult.is_emergency && (
-                  <a
-                    href="tel:1990"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg transition-colors shrink-0"
-                  >
-                    <PhoneCall className="w-4 h-4" />
-                    <span>{isSi ? "1990 සුවසැරිය / 911 අමතන්න" : "Emergency Direct Dial"}</span>
-                  </a>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Summary Grid: Elevated (Wedi) vs Decreased (Adu) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Elevated (Wedi) */}
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <TrendingUp className="w-4 h-4 text-rose-400" />
-                    <span>{isSi ? "වැඩි වී ඇති අගයන් (Elevated / High)" : "Elevated Biomarkers (High)"}</span>
-                  </span>
-                  <span className="font-mono text-xs font-bold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800">
-                    {analysisResult.elevated_count}
-                  </span>
-                </div>
-                {analysisResult.elevated_count === 0 ? (
-                  <p className="text-xs text-slate-500 italic">
-                    {isSi ? "සාමාන්‍ය සීමාව ඉක්මවා වැඩි වූ අගයන් නොමැත." : "No biomarkers exceeded the upper reference threshold."}
-                  </p>
-                ) : (
-                  <ul className="space-y-1 text-xs text-rose-300">
-                    {(isSi ? analysisResult.elevated_parameters_si : analysisResult.elevated_parameters_en).map((item, i) => (
-                      <li key={i} className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-                        <span className="font-medium">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Decreased (Adu) */}
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <TrendingDown className="w-4 h-4 text-amber-400" />
-                    <span>{isSi ? "අඩු වී ඇති අගයන් (Decreased / Low)" : "Decreased Biomarkers (Low)"}</span>
-                  </span>
-                  <span className="font-mono text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800">
-                    {analysisResult.decreased_count}
-                  </span>
-                </div>
-                {analysisResult.decreased_count === 0 ? (
-                  <p className="text-xs text-slate-500 italic">
-                    {isSi ? "සාමාන්‍ය සීමාවට වඩා අඩු වූ අගයන් නොමැත." : "No biomarkers fell below the lower reference threshold."}
-                  </p>
-                ) : (
-                  <ul className="space-y-1 text-xs text-amber-300">
-                    {(isSi ? analysisResult.decreased_parameters_si : analysisResult.decreased_parameters_en).map((item, i) => (
-                      <li key={i} className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                        <span className="font-medium">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            {/* Correlated Clinical Syndromes & ICD-11 */}
-            {analysisResult.correlated_conditions.length > 0 && (
-              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                <div className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-2">
-                  <Layers className="w-4 h-4" />
-                  <span>{isSi ? "හඳුනාගත් සායනික රෝග ලක්ෂණ සහ ICD-11 සබඳතා" : "Correlated Clinical Syndromes & ICD-11 Mapping"}</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {analysisResult.correlated_conditions.map((c, i) => (
-                    <div
-                      key={i}
-                      className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl space-y-1 text-xs"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-bold text-slate-100">{isSi ? c.condition_si : c.condition}</div>
-                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800 font-bold shrink-0">
-                          ICD-11: {c.icd11}
-                        </span>
-                      </div>
-                      <div className="text-slate-400 text-[11px] leading-relaxed">
-                        {isSi ? c.evidence_si : c.evidence}
-                      </div>
+                {/* Quick Summary Grid: Elevated (Wedi) vs Decreased (Adu) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Elevated (Wedi) */}
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <TrendingUp className="w-4 h-4 text-rose-400" />
+                        <span>{isSi ? "වැඩි වී ඇති අගයන් (Elevated / High)" : "Elevated Biomarkers (High)"}</span>
+                      </span>
+                      <span className="font-mono text-xs font-bold text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800">
+                        {analysisResult?.elevated_count ?? elevatedList.length}
+                      </span>
                     </div>
-                  ))}
+                    {elevatedList.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic">
+                        {isSi ? "සාමාන්‍ය සීමාව ඉක්මවා වැඩි වූ අගයන් නොමැත." : "No biomarkers exceeded the upper reference threshold."}
+                      </p>
+                    ) : (
+                      <ul className="space-y-1 text-xs text-rose-300">
+                        {elevatedList.map((item, i) => (
+                          <li key={i} className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                            <span className="font-medium">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Decreased (Adu) */}
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <TrendingDown className="w-4 h-4 text-amber-400" />
+                        <span>{isSi ? "අඩු වී ඇති අගයන් (Decreased / Low)" : "Decreased Biomarkers (Low)"}</span>
+                      </span>
+                      <span className="font-mono text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800">
+                        {analysisResult?.decreased_count ?? decreasedList.length}
+                      </span>
+                    </div>
+                    {decreasedList.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic">
+                        {isSi ? "සාමාන්‍ය සීමාවට වඩා අඩු වූ අගයන් නොමැත." : "No biomarkers fell below the lower reference threshold."}
+                      </p>
+                    ) : (
+                      <ul className="space-y-1 text-xs text-amber-300">
+                        {decreasedList.map((item, i) => (
+                          <li key={i} className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                            <span className="font-medium">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Detailed Biomarker Breakdown Cards */}
-            <div className="space-y-3">
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                <span>{isSi ? "පරීක්ෂා කළ සියලුම ජෛව රසායනික අගයන් (All Tested Parameters)" : "Tested Clinical Biomarkers Breakdown"}</span>
-                <span className="text-[11px] text-slate-500 font-mono">
-                  {analysisResult.total_parameters_tested} Parameters Evaluated
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {analysisResult.parameters.map((p) => {
-                  const isElevated = p.status === "ELEVATED" || p.status === "CRITICAL_HIGH";
-                  const isDecreased = p.status === "DECREASED" || p.status === "CRITICAL_LOW";
-                  const isPos = p.status === "POSITIVE";
-                  const isExpanded = expandedBiomarker === p.canonical_id;
-
-                  const badgeClass = p.is_critical
-                    ? "bg-rose-950 text-rose-300 border-rose-700 font-bold"
-                    : isElevated
-                    ? "bg-rose-950/60 text-rose-300 border-rose-800"
-                    : isDecreased
-                    ? "bg-amber-950/60 text-amber-300 border-amber-800"
-                    : isPos
-                    ? "bg-rose-950 text-rose-300 border-rose-700"
-                    : "bg-teal-950/60 text-teal-300 border-teal-800";
-
-                  return (
-                    <div
-                      key={p.canonical_id}
-                      className="p-4 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl transition-all"
-                    >
-                      <div
-                        onClick={() => setExpandedBiomarker(isExpanded ? null : p.canonical_id)}
-                        className="flex items-center justify-between cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="font-semibold text-xs text-slate-200">
-                            {isSi ? p.display_name_si : p.display_name_en}
-                          </div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${badgeClass}`}>
-                            {isSi ? p.status_si : p.status}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-4 text-xs">
-                          <div className="font-mono text-slate-200 font-bold">
-                            {p.raw_value} <span className="text-slate-400 font-normal">{p.unit}</span>
-                          </div>
-                          {p.ref_interval && (
-                            <div className="hidden sm:block text-[11px] font-mono text-slate-500">
-                              Ref: {p.ref_interval} {p.unit}
-                            </div>
-                          )}
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-slate-400" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
-                          )}
-                        </div>
-                      </div>
-
-                      {isExpanded && (
-                        <div className="mt-3 pt-3 border-t border-slate-800/80 text-xs space-y-2 text-slate-400">
-                          <div>
-                            <span className="font-semibold text-slate-300">
-                              {isSi ? "සායනික අර්ථකථනය:" : "Clinical Interpretation:"}{" "}
+                {/* Correlated Clinical Syndromes & ICD-11 */}
+                {correlatedList.length > 0 && (
+                  <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                    <div className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-2">
+                      <Layers className="w-4 h-4" />
+                      <span>{isSi ? "හඳුනාගත් සායනික රෝග ලක්ෂණ සහ ICD-11 සබඳතා" : "Correlated Clinical Syndromes & ICD-11 Mapping"}</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {correlatedList.map((c, i) => (
+                        <div
+                          key={i}
+                          className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl space-y-1 text-xs"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-bold text-slate-100">{isSi ? c.condition_si : c.condition}</div>
+                            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800 font-bold shrink-0">
+                              ICD-11: {c.icd11}
                             </span>
-                            {isSi ? p.interpretation_si : p.interpretation_en}
                           </div>
-                          {p.related_icd11 && p.related_icd11.length > 0 && (
-                            <div className="flex items-center gap-2 pt-1">
-                              <span className="text-[11px] font-semibold text-slate-400">WHO ICD-11:</span>
-                              <div className="flex gap-1">
-                                {p.related_icd11.map((code) => (
-                                  <span
-                                    key={code}
-                                    className="px-1.5 py-0.2 rounded bg-slate-800 text-teal-400 font-mono text-[10px]"
-                                  >
-                                    {code}
-                                  </span>
-                                ))}
+                          <div className="text-slate-400 text-[11px] leading-relaxed">
+                            {isSi ? c.evidence_si : c.evidence}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detailed Biomarker Breakdown Cards */}
+                <div className="space-y-3">
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>{isSi ? "පරීක්ෂා කළ සියලුම ජෛව රසායනික අගයන් (All Tested Parameters)" : "Tested Clinical Biomarkers Breakdown"}</span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      {analysisResult?.total_parameters_tested ?? parametersList.length} Parameters Evaluated
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {parametersList.map((p) => {
+                      const isElevated = p.status === "ELEVATED" || p.status === "CRITICAL_HIGH";
+                      const isDecreased = p.status === "DECREASED" || p.status === "CRITICAL_LOW";
+                      const isPos = p.status === "POSITIVE";
+                      const isExpanded = expandedBiomarker === p.canonical_id;
+
+                      const badgeClass = p.is_critical
+                        ? "bg-rose-950 text-rose-300 border-rose-700 font-bold"
+                        : isElevated
+                        ? "bg-rose-950/60 text-rose-300 border-rose-800"
+                        : isDecreased
+                        ? "bg-amber-950/60 text-amber-300 border-amber-800"
+                        : isPos
+                        ? "bg-rose-950 text-rose-300 border-rose-700"
+                        : "bg-teal-950/60 text-teal-300 border-teal-800";
+
+                      return (
+                        <div
+                          key={p.canonical_id}
+                          className="p-4 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl transition-all"
+                        >
+                          <div
+                            onClick={() => setExpandedBiomarker(isExpanded ? null : p.canonical_id)}
+                            className="flex items-center justify-between cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="font-semibold text-xs text-slate-200">
+                                {isSi ? p.display_name_si : p.display_name_en}
                               </div>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono border ${badgeClass}`}>
+                                {isSi ? p.status_si : p.status}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-4 text-xs">
+                              <div className="font-mono text-slate-200 font-bold">
+                                {p.raw_value} <span className="text-slate-400 font-normal">{p.unit}</span>
+                              </div>
+                              {p.ref_interval && (
+                                <div className="hidden sm:block text-[11px] font-mono text-slate-500">
+                                  Ref: {p.ref_interval} {p.unit}
+                                </div>
+                              )}
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4 text-slate-400" />
+                              )}
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="mt-3 pt-3 border-t border-slate-800/80 text-xs space-y-2 text-slate-400">
+                              <div>
+                                <span className="font-semibold text-slate-300">
+                                  {isSi ? "සායනික අර්ථකථනය:" : "Clinical Interpretation:"}{" "}
+                                </span>
+                                {isSi ? p.interpretation_si : p.interpretation_en}
+                              </div>
+                              {p.related_icd11 && p.related_icd11.length > 0 && (
+                                <div className="flex items-center gap-2 pt-1">
+                                  <span className="text-[11px] font-semibold text-slate-400">WHO ICD-11:</span>
+                                  <div className="flex gap-1">
+                                    {p.related_icd11.map((code) => (
+                                      <span
+                                        key={code}
+                                        className="px-1.5 py-0.2 rounded bg-slate-800 text-teal-400 font-mono text-[10px]"
+                                      >
+                                        {code}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* OCR Extracted Text Preview Toggle */}
+                {analysisResult?.extracted_text_preview && (
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowExtractedOcr(!showExtractedOcr)}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Scan className="w-3.5 h-3.5 text-teal-400" />
+                        <span>{isSi ? "හඳුනාගත් OCR අක්ෂර පෙළ (Extracted Raw Text)" : "Extracted OCR Document Transcript"}</span>
+                      </span>
+                      {showExtractedOcr ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+
+                    {showExtractedOcr && (
+                      <pre className="p-3 bg-slate-950 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap leading-relaxed border border-slate-800">
+                        {analysisResult.extracted_text_preview}
+                      </pre>
+                    )}
+                  </div>
+                )}
+
+                {/* Recommended Specialists */}
+                {specialistsList.length > 0 && (
+                  <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+                    <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                      <Stethoscope className="w-4 h-4 text-teal-400" />
+                      <span>{isSi ? "නිර්දේශිත විශේෂඥ වෛද්‍ය අංශ (Recommended Specialists)" : "Recommended Specialist Referrals"}</span>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {specialistsList.map((spec, i) => (
+                        <span
+                          key={i}
+                          className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-300 text-xs font-medium"
+                        >
+                          {spec}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* OCR Extracted Text Preview Toggle */}
-            {analysisResult.extracted_text_preview && (
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setShowExtractedOcr(!showExtractedOcr)}
-                  className="w-full flex items-center justify-between text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Scan className="w-3.5 h-3.5 text-teal-400" />
-                    <span>{isSi ? "හඳුනාගත් OCR අක්ෂර පෙළ (Extracted Raw Text)" : "Extracted OCR Document Transcript"}</span>
-                  </span>
-                  {showExtractedOcr ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
-
-                {showExtractedOcr && (
-                  <pre className="p-3 bg-slate-950 rounded-lg text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap leading-relaxed border border-slate-800">
-                    {analysisResult.extracted_text_preview}
-                  </pre>
+                {/* Clinical Directives & Next Steps */}
+                {directivesList.length > 0 && (
+                  <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+                    <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                      <Info className="w-4 h-4 text-teal-400" />
+                      <span>{isSi ? "ක්ෂණික සායනික උපදෙස් සහ ආරක්ෂණ ක්‍රියාමාර්ග" : "Clinical Action Directives & Safety Netting"}</span>
+                    </div>
+                    <ul className="space-y-1.5 text-slate-300 pt-1">
+                      {directivesList.map((dir, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-teal-400 font-bold">•</span>
+                          <span className="leading-relaxed">{dir}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
-            )}
-
-            {/* Recommended Specialists */}
-            <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
-              <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <Stethoscope className="w-4 h-4 text-teal-400" />
-                <span>{isSi ? "නිර්දේශිත විශේෂඥ වෛද්‍ය අංශ (Recommended Specialists)" : "Recommended Specialist Referrals"}</span>
-              </div>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {analysisResult.recommended_specialists.map((spec, i) => (
-                  <span
-                    key={i}
-                    className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-300 text-xs font-medium"
-                  >
-                    {spec}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Clinical Directives & Next Steps */}
-            <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
-              <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <Info className="w-4 h-4 text-teal-400" />
-                <span>{isSi ? "ක්ෂණික සායනික උපදෙස් සහ ආරක්ෂණ ක්‍රියාමාර්ග" : "Clinical Action Directives & Safety Netting"}</span>
-              </div>
-              <ul className="space-y-1.5 text-slate-300 pt-1">
-                {(isSi ? analysisResult.clinical_directives_si : analysisResult.clinical_directives_en).map((dir, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-teal-400 font-bold">•</span>
-                    <span className="leading-relaxed">{dir}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+            );
+          })()
         )}
       </div>
     </div>

@@ -250,10 +250,32 @@ class MedicalReportAnalyzer:
         if not extracted_parameters:
             return {
                 "success": False,
+                "overall_status": "UNKNOWN",
+                "overall_status_en": "NO CLINICAL BIOMARKERS DETECTED",
+                "overall_status_si": "හඳුනාගත හැකි සායනික පරීක්ෂණ අගයන් සොයාගත නොහැකි විය",
+                "qualitative_verdict": "NOT_APPLICABLE",
+                "is_emergency": False,
+                "total_parameters_tested": 0,
+                "abnormal_count": 0,
+                "elevated_count": 0,
+                "decreased_count": 0,
+                "elevated_parameters_en": [],
+                "elevated_parameters_si": [],
+                "decreased_parameters_en": [],
+                "decreased_parameters_si": [],
+                "critical_parameters": [],
+                "parameters": [],
+                "correlated_conditions": [],
+                "recommended_specialists": ["General Physician / Family Doctor"],
+                "clinical_directives_en": [
+                    "Please verify the report format or ensure lighting and text legibility are clear."
+                ],
+                "clinical_directives_si": [
+                    "කරුණාකර වාර්තාවේ අකුරු සහ අගයන් පැහැදිලිව පෙනේදැයි පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+                ],
                 "message_en": "No standardized laboratory biomarker values could be automatically identified from the provided text. Please verify the report format or enter values manually.",
                 "message_si": "ලබාදුන් වාර්තාවෙන් හඳුනාගත හැකි සායනික පරීක්ෂණ අගයන් සොයාගත නොහැකි විය. කරුණාකර වාර්තාවේ පැහැදිලි බව පරීක්ෂා කරන්න හෝ අගයන් ඇතුළත් කරන්න.",
-                "parameters_found": 0,
-                "parameters": []
+                "parameters_found": 0
             }
 
         abnormal_params = [p for p in extracted_parameters if p["is_abnormal"]]
