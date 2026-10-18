@@ -95,6 +95,14 @@ SAMPLE_CLINICAL_REPORTS = [
 ]
 
 
+class CameraImageCaptureRequest(BaseModel):
+    image_base64: str = Field(..., description="Base64 data URL or raw base64 string of camera capture")
+    filename: Optional[str] = "camera_capture.jpg"
+    patient_age_group: Optional[str] = "ADULT"
+    biological_sex: Optional[str] = "UNSPECIFIED"
+    language: Optional[str] = "en"
+
+
 @router.post("/upload")
 async def upload_medical_report(
     file: UploadFile = File(...),
@@ -103,16 +111,17 @@ async def upload_medical_report(
     language: str = Form("en")
 ):
     """
-    Accepts laboratory report files (PDF, TXT, CSV), extracts raw text,
-    identifies clinical biomarkers, and returns a structured clinical interpretation.
+    Accepts laboratory report files (PDF, TXT, CSV, or photographed images PNG/JPG/WEBP),
+    extracts raw text (with OCR for images), identifies clinical biomarkers,
+    and returns a structured clinical interpretation.
     """
-    allowed_extensions = (".pdf", ".txt", ".csv", ".text")
+    allowed_extensions = (".pdf", ".txt", ".csv", ".text", ".png", ".jpg", ".jpeg", ".webp", ".bmp")
     filename = file.filename or "report.txt"
 
     if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported file format. Please upload a PDF (.pdf) or text document (.txt, .csv)."
+            detail="Unsupported file format. Please upload a PDF (.pdf), document (.txt, .csv), or report photo (.png, .jpg, .jpeg, .webp)."
         )
 
     try:
@@ -122,7 +131,7 @@ async def upload_medical_report(
         if not extracted_text or len(extracted_text.strip()) < 5:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Unable to extract text content from the uploaded document. Ensure the file contains readable text."
+                detail="Unable to extract text content from the uploaded document or image. Ensure the image has good lighting and readable text."
             )
 
         analysis = report_analyzer.analyze_report(
@@ -141,6 +150,49 @@ async def upload_medical_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while processing the clinical report: {str(e)}"
         )
+
+
+@router.post("/capture-image")
+async def capture_medical_report_image(payload: CameraImageCaptureRequest):
+    """
+    Accepts base64 encoded photo from device camera (laptop webcam or smartphone camera),
+    decodes image bytes, executes OCR, and returns complete clinical report interpretation.
+    """
+    import base64
+    raw_b64 = payload.image_base64
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+
+    try:
+        image_bytes = base64.b64decode(raw_b64)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid base64 image data: {str(e)}"
+        )
+
+    if len(image_bytes) < 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Captured image payload is empty or corrupted."
+        )
+
+    extracted_text = report_analyzer.extract_text_from_image(image_bytes)
+    if not extracted_text or len(extracted_text.strip()) < 5:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not detect readable text from the captured image. Please ensure good lighting and align the medical document clearly in the camera frame."
+        )
+
+    analysis = report_analyzer.analyze_report(
+        raw_text=extracted_text,
+        patient_age_group=payload.patient_age_group or "ADULT",
+        biological_sex=payload.biological_sex or "UNSPECIFIED",
+        language=payload.language or "en"
+    )
+    analysis["filename"] = payload.filename or "camera_capture.jpg"
+    analysis["extracted_text_preview"] = extracted_text[:500] + ("..." if len(extracted_text) > 500 else "")
+    return analysis
 
 
 @router.post("/analyze-text")

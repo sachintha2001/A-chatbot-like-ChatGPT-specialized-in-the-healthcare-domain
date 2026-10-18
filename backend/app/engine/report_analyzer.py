@@ -17,9 +17,15 @@ class MedicalReportAnalyzer:
 
     def extract_text_from_file(self, file_bytes: bytes, filename: str) -> str:
         """
-        Extracts plain text content from uploaded medical documents (PDF or plain text).
+        Extracts plain text content from uploaded medical documents (PDF, plain text, or photographed images).
+        Supports Optical Character Recognition (OCR) for camera captures and scans (.png, .jpg, .jpeg, .webp, .bmp).
         """
         filename_lower = filename.lower()
+        image_extensions = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff")
+
+        if any(filename_lower.endswith(ext) for ext in image_extensions):
+            return self.extract_text_from_image(file_bytes)
+
         if filename_lower.endswith(".pdf"):
             try:
                 import pypdf
@@ -29,13 +35,65 @@ class MedicalReportAnalyzer:
                     page_text = page.extract_text()
                     if page_text:
                         text_pages.append(page_text)
-                return "\n".join(text_pages)
-            except Exception as e:
-                # If PDF extraction fails, attempt fallback string decoding
-                return file_bytes.decode("utf-8", errors="ignore")
+                extracted = "\n".join(text_pages)
+                if extracted and len(extracted.strip()) >= 15:
+                    return extracted
+            except Exception:
+                pass
+
+            return file_bytes.decode("utf-8", errors="ignore")
         else:
             # Plain text, CSV, or markdown
             return file_bytes.decode("utf-8", errors="ignore")
+
+    def extract_text_from_image(self, file_bytes: bytes) -> str:
+        """
+        Performs Optical Character Recognition (OCR) on an image of a physical medical laboratory report
+        using PIL (Pillow) and Tesseract OCR engine with contrast, grayscale, and adaptive preprocessing.
+        """
+        try:
+            from PIL import Image, ImageEnhance, ImageOps
+            import pytesseract
+
+            img = Image.open(io.BytesIO(file_bytes))
+
+            # Auto-orient using EXIF metadata if present (common with smartphone cameras)
+            try:
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass
+
+            # Convert to RGB if RGBA or palette
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+
+            # Convert to grayscale
+            gray = img.convert("L")
+
+            # Upscale if image is smaller than standard document resolution to enhance character definition
+            width, height = gray.size
+            if width < 1200:
+                scale_factor = 1200 / float(width)
+                new_size = (int(width * scale_factor), int(height * scale_factor))
+                gray = gray.resize(new_size, Image.Resampling.LANCZOS)
+
+            # Contrast enhancement for laboratory printouts
+            enhancer = ImageEnhance.Contrast(gray)
+            enhanced = enhancer.enhance(1.8)
+
+            # OCR with standard layout analysis
+            # Try automatic page segmentation (psm 3) first
+            text = pytesseract.image_to_string(enhanced, config="--oem 3 --psm 3")
+
+            # If text is sparse, attempt psm 6 (single uniform block of text)
+            if not text or len(text.strip()) < 15:
+                alt_text = pytesseract.image_to_string(gray, config="--oem 3 --psm 6")
+                if len(alt_text.strip()) > len(text.strip()):
+                    text = alt_text
+
+            return text or ""
+        except Exception as e:
+            return f"OCR Extraction Error: {str(e)}"
 
     def parse_report_text(self, raw_text: str) -> List[Dict[str, Any]]:
         """
@@ -53,14 +111,15 @@ class MedicalReportAnalyzer:
         return extracted_results
 
     def _match_biomarker_in_text(self, text: str, biomarker: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        aliases = biomarker["aliases"]
-        # Pattern to capture test name followed by value
-        alias_pattern = r"(?:" + "|".join([re.escape(a) for a in aliases]) + r")"
+        # Sort aliases by length descending so longer compound names match before substrings
+        sorted_aliases = sorted(biomarker["aliases"], key=len, reverse=True)
+        alias_pattern = r"(?:" + "|".join([re.escape(a) for a in sorted_aliases]) + r")"
+        qualifier_suffix = r"(?:\s*(?:count|level|result|value|reading|rate))?"
 
         if biomarker["is_qualitative"]:
             # Qualitative search (Positive / Negative / Reactive / Non-reactive)
             qual_pattern = (
-                rf"{alias_pattern}\s*[:=-]?\s*(positive|negative|reactive|non-reactive|detected|not\s+detected|nil|\+|-|1\+|2\+|3\+)"
+                rf"{alias_pattern}{qualifier_suffix}[ \t.:|\-_]*(positive|negative|reactive|non-reactive|nonreactive|detected|not\s+detected|nil|\+|-|1\+|2\+|3\+)"
             )
             match = re.search(qual_pattern, text, re.IGNORECASE)
             if match:
@@ -86,14 +145,28 @@ class MedicalReportAnalyzer:
                     "related_icd11": biomarker.get("related_icd11", [])
                 }
         else:
-            # Quantitative search (Numeric value with optional decimals)
+            # Quantitative search (Numeric value with optional decimals, commas)
             num_pattern = (
-                rf"{alias_pattern}\s*[:=-]?\s*([0-9]+(?:\.[0-9]+)?)"
+                rf"{alias_pattern}{qualifier_suffix}[ \t.:|\-_]*([0-9]+(?:[.,][0-9]+)?)"
             )
             match = re.search(num_pattern, text, re.IGNORECASE)
             if match:
                 try:
-                    num_val = float(match.group(1))
+                    num_val = float(match.group(1).replace(",", "."))
+                    canonical_id = biomarker["canonical_id"]
+
+                    # Smart OCR decimal correction for physical document camera captures
+                    if canonical_id == "hemoglobin" and 50 <= num_val <= 250:
+                        num_val = round(num_val / 10.0, 1)
+                    elif canonical_id == "hba1c" and 30 <= num_val <= 250:
+                        num_val = round(num_val / 10.0, 1)
+                    elif canonical_id == "serum_creatinine" and 15 <= num_val <= 250:
+                        num_val = round(num_val / 10.0, 2)
+                    elif canonical_id == "pcv" and 200 <= num_val <= 750:
+                        num_val = round(num_val / 10.0, 1)
+                    elif canonical_id == "troponin" and 10 <= num_val <= 1000:
+                        num_val = round(num_val / 100.0, 2)
+
                     ref_min = biomarker["ref_min"]
                     ref_max = biomarker["ref_max"]
                     panic_low = biomarker.get("panic_low")

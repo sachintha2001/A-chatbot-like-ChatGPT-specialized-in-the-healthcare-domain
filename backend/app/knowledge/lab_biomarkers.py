@@ -32,7 +32,7 @@ CLINICAL_BIOMARKER_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     "platelets": {
         "canonical_id": "platelets",
-        "aliases": ["platelet", "platelets", "plt", "platelet count", "thrombocytes", "පට්ටිකා", "පට්ටිකා ප්‍රමාණය"],
+        "aliases": ["platelet", "platelets", "plt", "platelet count", "plateletcount", "thrombocytes", "පට්ටිකා", "පට්ටිකා ප්‍රමාණය"],
         "display_name_en": "Platelet Count (PLT)",
         "display_name_si": "රුධිර පට්ටිකා ප්‍රමාණය (Platelet Count)",
         "category": "Full Blood Count (FBC / CBC)",

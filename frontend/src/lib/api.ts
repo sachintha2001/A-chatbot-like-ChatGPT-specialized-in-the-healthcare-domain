@@ -398,6 +398,33 @@ export async function analyzeReportText(
   return res.json();
 }
 
+export async function captureMedicalReportImage(
+  imageBase64: string,
+  params?: {
+    patientAgeGroup?: string;
+    biologicalSex?: string;
+    language?: string;
+  }
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/reports/capture-image`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image_base64: imageBase64,
+      filename: "camera_capture.jpg",
+      patient_age_group: params?.patientAgeGroup || "ADULT",
+      biological_sex: params?.biologicalSex || "UNSPECIFIED",
+      language: params?.language || "en"
+    })
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Camera capture analysis failed" }));
+    throw new Error(errorData.detail || "Medical report camera analysis failed");
+  }
+  return res.json();
+}
+
 export async function fetchSampleReports(): Promise<{ samples: any[] }> {
   const res = await fetch(`${API_BASE}/reports/samples`);
   if (!res.ok) throw new Error("Failed to fetch sample clinical reports");

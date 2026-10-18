@@ -103,3 +103,32 @@ def test_sinhala_translations_in_report_output():
     assert len(result["elevated_parameters_si"]) >= 1
     assert "නිරාහාර රුධිර සීනි" in result["elevated_parameters_si"][0]
     assert result["qualitative_verdict"] == "NEGATIVE"
+
+
+def test_image_ocr_report_analysis():
+    import io
+    from PIL import Image, ImageDraw
+
+    # Generate a synthetic medical report image
+    img = Image.new("RGB", (700, 350), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    sample_text = (
+        "CLINICAL LABORATORY REPORT\n"
+        "Hemoglobin: 14.5 g/dL\n"
+        "Platelet Count: 45000 /uL\n"
+        "Dengue NS1 Antigen: POSITIVE"
+    )
+    draw.text((30, 30), sample_text, fill=(0, 0, 0))
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    image_bytes = buf.getvalue()
+
+    analyzer = MedicalReportAnalyzer()
+    extracted_text = analyzer.extract_text_from_file(image_bytes, "camera_photo.png")
+    assert "Platelet" in extracted_text or "45000" in extracted_text
+
+    result = analyzer.analyze_report(extracted_text)
+    assert result["success"] is True
+    assert result["overall_status"] == "CRITICAL_EMERGENCY"
+    assert result["is_emergency"] is True
