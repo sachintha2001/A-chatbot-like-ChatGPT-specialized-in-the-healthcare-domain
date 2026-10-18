@@ -183,3 +183,70 @@ export interface MonitoringStatus {
   total_guidelines_indexed: number;
   guidelines_catalog: GuidelineCatalogItem[];
 }
+
+export type TriageWorkflowState = "RED_FLAG_EMERGENCY" | "CLINICAL_INTAKE_REQUIRED" | "STRUCTURED_ASSESSMENT";
+export type TriageAcuityLevel = "EMERGENCY" | "URGENT_CONSULT" | "ROUTINE_CLINIC" | "SELF_CARE_MONITORING";
+
+export interface StreamCitation {
+  badge: string;
+  authority: string;
+  title: string;
+  excerpt: string;
+  url: string;
+}
+
+export interface StreamBadgeData {
+  state: TriageWorkflowState;
+  acuity: TriageAcuityLevel;
+  headline: string;
+  is_emergency: boolean;
+}
+
+export interface StreamStatusData {
+  stage: string;
+  message: string;
+}
+
+export interface PathologySummaryItem {
+  id: number;
+  icd11_code: string;
+  clinical_name: string;
+  medical_specialty: string;
+  baseline_acuity: TriageAcuityLevel;
+  primary_symptoms: string[];
+  red_flag_count: number;
+}
+
+export interface PathologyDetailItem {
+  id: number;
+  icd11_code: string;
+  icd10_code?: string;
+  clinical_name: string;
+  common_aliases: string[];
+  medical_specialty: string;
+  baseline_acuity: TriageAcuityLevel;
+  pathophysiology_overview: string;
+  cardinal_symptoms: {
+    primary: { symptom: string; weight: number }[];
+    secondary: { symptom: string; weight: number }[];
+  };
+  red_flag_criteria: string[];
+  differential_diagnoses: { condition: string; icd11: string; distinction: string }[];
+  diagnostic_workup: {
+    initial_labs: string[];
+    imaging_ecg: string[];
+    confirmatory_tests: string[];
+  };
+  evidence_based_management: {
+    first_line_lifestyle: string[];
+    pharmacotherapy: string[];
+    contraindications: string[];
+  };
+  source_metadata: {
+    issuing_authority: string;
+    guideline_title: string;
+    publication_year: number;
+    source_url?: string;
+  };
+}
+

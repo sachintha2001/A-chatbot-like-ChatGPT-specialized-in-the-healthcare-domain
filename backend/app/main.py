@@ -11,6 +11,7 @@ from app.models.user import User, UserRole
 from app.auth.security import hash_password
 from app.ingestion.seed_loader import seed_clinical_guidelines
 from app.ingestion.vector_store import vector_store
+from app.knowledge.clinical_corpus_loader import ingest_pathology_corpus
 from app.api.v1 import api_v1_router
 
 
@@ -23,6 +24,9 @@ async def bootstrap_initial_state():
     async with AsyncSessionLocal() as session:
         guideline_dir = "./data/guidelines" if os.path.exists("./data/guidelines") else "backend/data/guidelines"
         await seed_clinical_guidelines(session, guidelines_dir=guideline_dir)
+
+        # 3. Ingest multi-specialty clinical pathology ontology into PostgreSQL and vector store
+        await ingest_pathology_corpus(session, vector_store)
 
         # 3. Seed verified clinician, auditor, and patient test accounts
         clinician_stmt = select(User).where(User.email == "dr.evans@hospital.nhs.uk")

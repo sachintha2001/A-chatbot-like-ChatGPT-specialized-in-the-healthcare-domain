@@ -21,6 +21,11 @@ from app.models.monitoring import (
     MetricSeverity,
     ClinicalGuidelineCatalog,
 )
+from app.models.pathology import (
+    Pathology,
+    MedicalSpecialty,
+    TriageAcuityLevel,
+)
 
 __all__ = [
     "Base",
@@ -39,4 +44,7 @@ __all__ = [
     "MetricCategory",
     "MetricSeverity",
     "ClinicalGuidelineCatalog",
+    "Pathology",
+    "MedicalSpecialty",
+    "TriageAcuityLevel",
 ]

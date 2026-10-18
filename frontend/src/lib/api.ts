@@ -6,7 +6,10 @@ import {
   AnalyticsOverview,
   EvaluationRunResult,
   ClinicalEvalMetric,
-  MonitoringStatus
+  MonitoringStatus,
+  StreamBadgeData,
+  StreamCitation,
+  StreamStatusData
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
@@ -208,3 +211,138 @@ export async function fetchFHIRPatientSummary(sessionId: string): Promise<any> {
   if (!res.ok) throw new Error("Failed to export FHIR Patient Summary");
   return res.json();
 }
+
+export async function fetchPathologies(params?: {
+  specialty?: string;
+  acuity?: string;
+  search?: string;
+  limit?: number;
+}): Promise<any[]> {
+  const query = new URLSearchParams();
+  if (params?.specialty) query.append("specialty", params.specialty);
+  if (params?.acuity) query.append("acuity", params.acuity);
+  if (params?.search) query.append("search", params.search);
+  if (params?.limit) query.append("limit", params.limit.toString());
+
+  const res = await fetch(`${API_BASE}/knowledge/pathologies?${query.toString()}`);
+  if (!res.ok) throw new Error("Failed to fetch clinical pathologies");
+  return res.json();
+}
+
+export async function fetchPathologyByIcd11(icd11Code: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/knowledge/pathologies/${encodeURIComponent(icd11Code)}`);
+  if (!res.ok) throw new Error(`Pathology with ICD-11 '${icd11Code}' not found`);
+  return res.json();
+}
+
+export async function fetchSpecialties(): Promise<{ total_pathologies: number; specialties: Record<string, number> }> {
+  const res = await fetch(`${API_BASE}/knowledge/specialties`);
+  if (!res.ok) throw new Error("Failed to fetch specialty breakdown");
+  return res.json();
+}
+
+export async function fetchFederatedCondition(query: string, icd10?: string): Promise<any> {
+  const params = new URLSearchParams({ q: query });
+  if (icd10) params.append("icd10", icd10);
+  const res = await fetch(`${API_BASE}/knowledge/federated/condition?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to query federated medical sources");
+  return res.json();
+}
+
+export async function fetchFederatedMedication(drugName: string): Promise<any> {
+  const params = new URLSearchParams({ name: drugName });
+  const res = await fetch(`${API_BASE}/knowledge/federated/medication?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to query OpenFDA drug label");
+  return res.json();
+}
+
+export async function streamClinicalChat(
+  params: {
+    message: string;
+    conversationHistory?: { role: string; content: string }[];
+    preferredLanguage?: string;
+  },
+  callbacks: {
+    onStatus?: (data: StreamStatusData) => void;
+    onBadge?: (data: StreamBadgeData) => void;
+    onToken?: (token: string) => void;
+    onCitations?: (citations: StreamCitation[]) => void;
+    onFollowUpChips?: (chips: string[]) => void;
+    onDone?: (data: any) => void;
+    onError?: (err: Error) => void;
+  }
+): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream"
+      },
+      body: JSON.stringify({
+        message: params.message,
+        conversation_history: params.conversationHistory || [],
+        preferred_language: params.preferredLanguage
+      })
+    });
+
+    if (!res.ok || !res.body) {
+      throw new Error(`Server returned HTTP ${res.status}: Streaming triage failed`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split("\n\n");
+      buffer = blocks.pop() || "";
+
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+
+        let eventType = "message";
+        let rawData = "";
+
+        for (const line of block.split("\n")) {
+          if (line.startsWith("event: ")) {
+            eventType = line.replace("event: ", "").trim();
+          } else if (line.startsWith("data: ")) {
+            rawData = line.replace("data: ", "").trim();
+          }
+        }
+
+        if (!rawData) continue;
+
+        try {
+          const parsed = JSON.parse(rawData);
+          if (eventType === "status") {
+            callbacks.onStatus?.(parsed);
+          } else if (eventType === "triage_badge") {
+            callbacks.onBadge?.(parsed);
+          } else if (eventType === "token") {
+            callbacks.onToken?.(parsed.token || "");
+          } else if (eventType === "citations") {
+            callbacks.onCitations?.(parsed.citations || []);
+          } else if (eventType === "follow_up_chips") {
+            callbacks.onFollowUpChips?.(parsed.chips || []);
+          } else if (eventType === "done") {
+            callbacks.onDone?.(parsed);
+          }
+        } catch (e) {
+          // If non-JSON data
+          if (eventType === "token") {
+            callbacks.onToken?.(rawData);
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    callbacks.onError?.(err);
+  }
+}
+
