@@ -64,6 +64,21 @@ services:
     networks:
       - medguard-edge
 
+  db-viewer:
+    image: sosedoff/pgweb:latest
+    container_name: medguard-db-viewer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-medguard_user}:${POSTGRES_PASSWORD:-medguard_secret}@postgres:5432/${POSTGRES_DB:-medguard_db}?sslmode=disable
+    ports:
+      - "8081:8081"
+    networks:
+      - medguard-internal
+      - medguard-edge
+
 volumes:
   postgres_data:
   backend_audit_logs:

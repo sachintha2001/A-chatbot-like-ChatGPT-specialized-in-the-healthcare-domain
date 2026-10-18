@@ -104,6 +104,7 @@ docker compose up --build
 
 - Frontend Clinical Portal: `http://localhost:3000`
 - Backend API & Interactive Docs: `http://localhost:8000/docs`
+- Visual Database Explorer (Web GUI): `http://localhost:8081`
 - Operational Health Check: `http://localhost:8000/api/v1/health`
 
 ### Option B: Local Developer Mode
