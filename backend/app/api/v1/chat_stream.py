@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from app.engine.triage_state_machine import triage_state_machine
 from app.engine.llm_connector import hybrid_llm_connector
+from app.compliance.security_shield import security_shield, SecurityThreatException
 
 router = APIRouter(prefix="/chat", tags=["Clinical Conversational Streaming"])
 
@@ -49,10 +50,37 @@ async def sse_event_stream(
         data_str = json.dumps(data) if not isinstance(data, str) else json.dumps({"text": data})
         return f"event: {event}\ndata: {data_str}\n\n"
 
+    # Stage -1: Zero-Trust WAF & Adversarial Prompt-Injection / XSS / SQLi Inspection
+    try:
+        sanitized_message = security_shield.inspect_text_input(message, context_label="chat_stream_prompt")
+    except SecurityThreatException as threat:
+        is_si = preferred_language == "si"
+        sec_msg = threat.message_si if is_si else threat.message_en
+        yield format_sse("triage_badge", {
+            "state": "SECURITY_SHIELD_BLOCKED",
+            "acuity": "ROUTINE",
+            "headline": f"🛡️ MedGuard Zero-Trust Security Shield — {threat.threat_category} Blocked",
+            "is_emergency": False,
+            "llm_provider": "security_waf",
+            "llm_model": "MedGuard-ZeroTrust-WAF-v2",
+            "cloud_synthesized": False,
+            "scrubbed_entities": [threat.threat_category]
+        })
+        yield format_sse("token", {
+            "token": f"**[MedGuard Zero-Trust Security Shield — {threat.threat_category}]**\n\n{sec_msg}",
+            "index": 0
+        })
+        yield format_sse("done", {
+            "status": "blocked_by_security_shield",
+            "state": "SECURITY_SHIELD_BLOCKED",
+            "acuity": "ROUTINE"
+        })
+        return
+
     # Stage 0: Pre-transmission HIPAA Safe Harbor & Sinhala/Singlish PHI Scrubbing
     yield format_sse("status", {
         "stage": "scrubbing_phi",
-        "message": "Enforcing HIPAA Safe Harbor PHI Scrubber & normalizing complex narrative..."
+        "message": "Enforcing HIPAA Safe Harbor PHI Scrubber & Zero-Leakage DLP..."
     })
     await asyncio.sleep(0.03)
 
@@ -72,7 +100,7 @@ async def sse_event_stream(
 
     # Process Hybrid State Machine + Cloud LLM Connector (over PHI-scrubbed text)
     result = await triage_state_machine.process_turn_hybrid_async(
-        user_message=message,
+        user_message=sanitized_message,
         conversation_history=history,
         preferred_language=preferred_language,
         age_group=age_group,
@@ -102,8 +130,8 @@ async def sse_event_stream(
     })
     await asyncio.sleep(0.02)
 
-    # Stage 5: Token streaming
-    content = result["content"]
+    # Stage 5: Outbound DLP Scrubbing + Token streaming
+    content, _ = security_shield.scrub_outbound_dlp(result["content"])
     tokens = content.split(" ")
     for idx, token in enumerate(tokens):
         suffix = " " if idx < len(tokens) - 1 else ""
