@@ -9,7 +9,7 @@ from app.config import settings
 from app.database import engine, Base, AsyncSessionLocal, get_db_session
 from app.models.user import User, UserRole
 from app.auth.security import hash_password
-from app.ingestion.seed_loader import seed_clinical_guidelines
+from app.ingestion.seed_loader import seed_clinical_guidelines, seed_patient_profiles
 from app.ingestion.vector_store import vector_store
 from app.knowledge.clinical_corpus_loader import ingest_pathology_corpus
 from app.api.v1 import api_v1_router
@@ -27,6 +27,9 @@ async def bootstrap_initial_state():
 
         # 3. Ingest multi-specialty clinical pathology ontology into PostgreSQL and vector store
         await ingest_pathology_corpus(session, vector_store)
+
+        # 4. Ingest longitudinal patient profiles and historical records
+        await seed_patient_profiles(session)
 
         # 3. Seed verified clinician, auditor, and patient test accounts
         clinician_stmt = select(User).where(User.email == "dr.evans@hospital.nhs.uk")

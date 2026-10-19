@@ -65,6 +65,11 @@ flowchart TD
 ### 7. Maintenance, Drift & Misinformation Monitoring (`backend/app/monitoring/`)
 - Real-time monitoring of retrieval similarity moving averages, low-confidence query rates, hallucination flags, p95 latency, and guideline currency audits (alerting when protocols exceed 3 years since publication).
 
+### 8. Patient Profiles & Longitudinal EHR Records (`backend/app/engine/patient_history_engine.py`, `frontend/src/app/records/`, `frontend/src/app/reports/`)
+- **Family Health Profiles**: Comprehensive multilingual patient directory managing relationship hierarchies (`SELF`, `FATHER`, `MOTHER`, `SPOUSE`, `CHILD`, etc.), biological sex, blood group, allergies, chronic conditions, emergency contact numbers, and clinical history notes.
+- **Biomarker Trajectory Analytics**: Automated mathematical calculation of multi-point longitudinal trajectories (`IMPROVING`, `DETERIORATING`, `STABLE`, `CRITICAL_ATTENTION`) across hematological, metabolic, lipid, and renal markers (such as Platelet counts in Dengue fever, Fasting Blood Sugar, HbA1c, and Total Cholesterol).
+- **Direct EHR Diagnostic Ingestion**: One-click integration in the Medical Report Diagnostic Analyzer allowing clinicians and patients to persist parsed laboratory reports directly into longitudinal profiles with real-time trajectory visualization and timeline audits.
+
 ---
 
 ## Tech Stack

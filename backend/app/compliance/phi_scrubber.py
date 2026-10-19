@@ -19,8 +19,9 @@ class PHIScrubber:
         ("STREET_ADDRESS", re.compile(r"\b\d{1,5}\s+[A-Za-z0-9\.,\s]{3,30}\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr)\b", re.IGNORECASE)),
         ("NAME_TITLE", re.compile(r"\b(?:Dr\.|Doctor|Mr\.|Mrs\.|Ms\.|Patient|named)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b")),
         ("NAME_INTRO", re.compile(r"\b(?:My name is|I am|This is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b")),
-        # Sinhala PHI Patterns
+        # Sinhala & Singlish PHI Patterns
         ("NAME_SI", re.compile(r"(?:මගේ\s*නම|මම)\s+([^\s,.:;]+(?:\s+[^\s,.:;]+)?)")),
+        ("NAME_SINGLISH", re.compile(r"\b(?:mage\s+nama|my\s+name)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\b", re.IGNORECASE)),
         ("PHONE_SI", re.compile(r"(?:දුරකථන\s*අංක(?:ය|යයි)?|දුරකථන|දුරකතනය)[\s:#]+(\+?\d[\d\s-]{8,15})")),
         ("NIC_SI", re.compile(r"(?:ජාතික\s*හැඳුනුම්පත|හැඳුනුම්පත්\s*අංක(?:ය|යයි)?|හැඳුනුම්පත)[\s:#]+([0-9vVxX]+)")),
         ("DOB_SI", re.compile(r"(?:උපන්\s*දිනය)[\s:#]+(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})")),

@@ -200,6 +200,30 @@ export interface StreamBadgeData {
   acuity: TriageAcuityLevel;
   headline: string;
   is_emergency: boolean;
+  llm_provider?: string;
+  llm_model?: string;
+  cloud_synthesized?: boolean;
+  scrubbed_entities?: string[];
+}
+
+export interface HybridLLMStatus {
+  configured_mode: string;
+  active_provider: string;
+  active_model: string;
+  cloud_llm_enabled: boolean;
+  phi_scrubber_enforced_pre_cloud: boolean;
+  deterministic_red_flag_gate_active: boolean;
+  providers_configured: {
+    gemini: boolean;
+    anthropic: boolean;
+    openai: boolean;
+    local_fallback: boolean;
+  };
+  models: {
+    gemini: string;
+    anthropic: string;
+    openai: string;
+  };
 }
 
 export interface StreamStatusData {
@@ -314,4 +338,170 @@ export interface SampleReportItem {
   sample_text: string;
 }
 
+export type PatientRelationship = "SELF" | "FATHER" | "MOTHER" | "SPOUSE" | "CHILD" | "SIBLING" | "OTHER";
+export type BiologicalSex = "MALE" | "FEMALE" | "UNSPECIFIED";
+export type MedicalRecordType = "LAB_REPORT" | "TRIAGE_SESSION" | "PHYSICAL_EXAM" | "DISCHARGE_SUMMARY";
 
+export interface PatientProfileItem {
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  relationship: PatientRelationship;
+  date_of_birth?: string | null;
+  biological_sex: BiologicalSex;
+  blood_group: string;
+  allergies: string[];
+  chronic_conditions: string[];
+  emergency_contact_phone?: string | null;
+  notes?: string | null;
+  total_records: number;
+  latest_record_date?: string | null;
+  created_at?: string | null;
+}
+
+export interface PatientMedicalRecordItem {
+  id: string;
+  profile_id: string;
+  record_type: MedicalRecordType;
+  record_date: string;
+  title: string;
+  overall_status: string;
+  qualitative_verdict: string;
+  extracted_biomarkers: any[];
+  correlated_icd11: any[];
+  notes?: string | null;
+  source_filename?: string | null;
+  created_at?: string | null;
+}
+
+export interface BiomarkerDataPoint {
+  record_id: string;
+  record_title: string;
+  date: string;
+  value: number;
+  unit: string;
+  status: string;
+  status_si: string;
+  is_abnormal: boolean;
+  is_critical: boolean;
+  display_name_en: string;
+  display_name_si: string;
+  ref_interval: string;
+}
+
+export interface BiomarkerTrendItem {
+  canonical_id: string;
+  display_name_en: string;
+  display_name_si: string;
+  category: string;
+  unit: string;
+  ref_interval: string;
+  data_points: BiomarkerDataPoint[];
+  point_count: number;
+  baseline_value: number;
+  previous_value: number;
+  latest_value: number;
+  delta_value: number;
+  delta_percentage: number;
+  trajectory: "IMPROVING" | "DETERIORATING" | "STABLE" | "CRITICAL_ATTENTION";
+  trajectory_label_en: string;
+  trajectory_label_si: string;
+  clinical_insight_en: string;
+  clinical_insight_si: string;
+  is_abnormal: boolean;
+  is_critical: boolean;
+}
+
+export interface PatientTrendsResponse {
+  profile_id: string;
+  patient_name: string;
+  total_records_analyzed: number;
+  tracked_biomarkers_count: number;
+  trends: BiomarkerTrendItem[];
+  overall_trajectory: "IMPROVING" | "DETERIORATING" | "STABLE" | "CRITICAL_ATTENTION";
+  longitudinal_summary_en: string;
+  longitudinal_summary_si: string;
+}
+
+export interface SpecialistDoctor {
+  doctor_id: string;
+  full_name_en: string;
+  full_name_si: string;
+  qualifications: string;
+  slmc_reg_no: string;
+  specialty_code: string;
+  specialty_en: string;
+  specialty_si: string;
+  primary_hospital_en: string;
+  primary_hospital_si: string;
+  visiting_hospitals: string[];
+  supported_modes: string[];
+  supported_gateways: string[];
+  consultation_fee_lkr: number;
+  next_available_slots: string[];
+  languages_spoken: string[];
+  rating: number;
+  echannelling_url: string;
+  doc990_url: string;
+  odoc_url: string;
+}
+
+export interface PartnerGatewayItem {
+  gateway_id: string;
+  name_en: string;
+  name_si: string;
+  description_en: string;
+  description_si: string;
+  portal_url: string;
+  hotline: string;
+}
+
+export interface SpecialistRecommendationResponse {
+  matched_specialty_code: string;
+  matched_specialty_en: string;
+  matched_specialty_si: string;
+  triage_acuity: string;
+  emergency_warning_active: boolean;
+  emergency_directive_en?: string | null;
+  emergency_directive_si?: string | null;
+  recommended_consultation_mode: string;
+  specialists: SpecialistDoctor[];
+  partner_gateways: PartnerGatewayItem[];
+}
+
+export interface AppointmentBookingRequestPayload {
+  doctor_id: string;
+  patient_name: string;
+  patient_phone: string;
+  patient_age?: number;
+  preferred_slot: string;
+  consultation_mode: string;
+  booking_gateway: string;
+  hospital_name?: string;
+  clinical_context_summary?: string;
+  recommended_specialty?: string;
+  triage_acuity?: string;
+  correlated_icd11_codes?: string[];
+  language?: string;
+}
+
+export interface AppointmentBookingResponse {
+  booking_id: string;
+  booking_reference: string;
+  status: string;
+  queue_token_number: number;
+  doctor: SpecialistDoctor;
+  patient_display_name: string;
+  patient_phone_masked: string;
+  scheduled_slot: string;
+  consultation_mode: string;
+  booking_gateway: string;
+  hospital_or_platform: string;
+  estimated_fee_lkr: number;
+  telemedicine_meeting_url?: string | null;
+  external_gateway_redirect_url: string;
+  sbar_clinical_handover_en: string;
+  sbar_clinical_handover_si: string;
+  created_at: string;
+}

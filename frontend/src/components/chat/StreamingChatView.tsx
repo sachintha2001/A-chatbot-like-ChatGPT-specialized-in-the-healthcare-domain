@@ -5,6 +5,7 @@ import {
   Send,
   AlertTriangle,
   ShieldAlert,
+  ShieldCheck,
   Activity,
   FileText,
   ExternalLink,
@@ -13,17 +14,31 @@ import {
   Stethoscope,
   ChevronRight,
   PhoneCall,
-  Info
+  Info,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Radio,
+  Cpu,
+  CalendarCheck
 } from "lucide-react";
 import {
   StreamCitation,
   StreamBadgeData,
   StreamStatusData,
   TriageAcuityLevel,
-  TriageWorkflowState
+  TriageWorkflowState,
+  HybridLLMStatus
 } from "@/lib/types";
-import { streamClinicalChat } from "@/lib/api";
+import { streamClinicalChat, fetchHybridLLMStatus, updateHybridLLMConfig } from "@/lib/api";
 import { useLanguage } from "@/lib/LanguageContext";
+import {
+  clinicalVoicePlayer,
+  ClinicalSpeechRecognizer,
+  isSpeechRecognitionSupported
+} from "@/lib/voice";
+import { AppointmentBookingModal } from "@/components/telemedicine/AppointmentBookingModal";
 
 interface ChatMessage {
   id: string;
@@ -51,14 +66,152 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
   const [streamedChips, setStreamedChips] = useState<string[]>([]);
   const [activeCitationModal, setActiveCitationModal] = useState<StreamCitation | null>(null);
 
+  // Hybrid Cloud LLM Connector State
+  const [llmStatus, setLlmStatus] = useState<HybridLLMStatus | null>(null);
+  const [isLlmModalOpen, setIsLlmModalOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState("auto");
+  const [geminiKey, setGeminiKey] = useState("");
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [savingLlmConfig, setSavingLlmConfig] = useState(false);
+
+  // Telemedicine & Specialist Booking Modal State
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [bookingHeadline, setBookingHeadline] = useState("");
+  const [bookingAcuity, setBookingAcuity] = useState("ROUTINE");
+  const [bookingSummary, setBookingSummary] = useState("");
+
+  // Voice Engine States
+  const [autoReadAloud, setAutoReadAloud] = useState<boolean>(false);
+  const [activePlayingId, setActivePlayingId] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const recognizerRef = useRef<ClinicalSpeechRecognizer | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Stop voice and audio on unmount, and load Hybrid LLM status
+  useEffect(() => {
+    fetchHybridLLMStatus()
+      .then((data) => {
+        setLlmStatus(data);
+        setSelectedProvider(data.configured_mode || "auto");
+      })
+      .catch(() => {});
+    return () => {
+      recognizerRef.current?.stop();
+      clinicalVoicePlayer.stop();
+    };
+  }, []);
+
+  const handleSaveLlmConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingLlmConfig(true);
+    try {
+      const updated = await updateHybridLLMConfig({
+        provider: selectedProvider,
+        gemini_api_key: geminiKey || undefined,
+        anthropic_api_key: anthropicKey || undefined,
+        openai_api_key: openaiKey || undefined
+      });
+      setLlmStatus(updated);
+      setIsLlmModalOpen(false);
+    } catch {
+      // ignore
+    } finally {
+      setSavingLlmConfig(false);
+    }
+  };
+
+  // Sync speech recognizer language when user switches language
+  useEffect(() => {
+    if (isListening && recognizerRef.current) {
+      recognizerRef.current.stop();
+      startVoiceListening();
+    }
+  }, [language]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamedText, activeStatus]);
 
+  const startVoiceListening = () => {
+    if (!isSpeechRecognitionSupported()) {
+      setVoiceNotice(t.voiceNotSupported);
+      setTimeout(() => setVoiceNotice(null), 4000);
+      return;
+    }
+
+    setVoiceNotice(t.voiceListening);
+    const recognizer = new ClinicalSpeechRecognizer({
+      language,
+      onResult: (transcript, isFinal) => {
+        if (isFinal) {
+          setInputText((prev) => (prev ? `${prev.trim()} ${transcript}` : transcript));
+        } else {
+          setVoiceNotice(`${t.voiceListening}: "${transcript}"`);
+        }
+      },
+      onError: (err) => {
+        setIsListening(false);
+        if (err === "not-allowed" || err === "permission-denied") {
+          setVoiceNotice(t.voicePermissionError);
+        } else {
+          setVoiceNotice(t.voicePermissionError);
+        }
+        setTimeout(() => setVoiceNotice(null), 5000);
+      },
+      onEnd: () => {
+        setIsListening(false);
+        setTimeout(() => setVoiceNotice(null), 1500);
+      }
+    });
+
+    const started = recognizer.start();
+    if (started) {
+      recognizerRef.current = recognizer;
+      setIsListening(true);
+    }
+  };
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      recognizerRef.current?.stop();
+      setIsListening(false);
+      setVoiceNotice(null);
+    } else {
+      startVoiceListening();
+    }
+  };
+
+  const handleToggleSpeak = (msgId: string, content: string) => {
+    if (activePlayingId === msgId) {
+      clinicalVoicePlayer.stop();
+      setActivePlayingId(null);
+    } else {
+      setActivePlayingId(msgId);
+      clinicalVoicePlayer.speak(msgId, content, language, {
+        onStart: () => setActivePlayingId(msgId),
+        onEnd: () => setActivePlayingId(null),
+        onError: () => setActivePlayingId(null)
+      });
+    }
+  };
+
+  const handleStopAllAudio = () => {
+    clinicalVoicePlayer.stop();
+    setActivePlayingId(null);
+  };
+
   const handleSend = async (messageToSend?: string) => {
+    // If voice recognition is listening, stop it when sending
+    if (isListening) {
+      recognizerRef.current?.stop();
+      setIsListening(false);
+      setVoiceNotice(null);
+    }
+
     const text = messageToSend || inputText;
     if (!text.trim() || isStreaming) return;
 
@@ -119,8 +272,9 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           setIsStreaming(false);
           setActiveStatus(null);
 
+          const assistantMsgId = `assistant-${Date.now()}`;
           const assistantMsg: ChatMessage = {
-            id: `assistant-${Date.now()}`,
+            id: assistantMsgId,
             sender: "CLINICIAN_ASSISTANT",
             content: accumulatedText,
             citations: finalCitations,
@@ -134,6 +288,13 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           setCurrentBadge(null);
           setStreamedCitations([]);
           setStreamedChips([]);
+
+          // Automatically speak clinical response if Auto Read Aloud is enabled
+          if (autoReadAloud && accumulatedText.trim()) {
+            setTimeout(() => {
+              handleToggleSpeak(assistantMsgId, accumulatedText);
+            }, 300);
+          }
         },
         onError: (err) => {
           setIsStreaming(false);
@@ -157,6 +318,11 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
   };
 
   const resetChat = () => {
+    clinicalVoicePlayer.stop();
+    recognizerRef.current?.stop();
+    setIsListening(false);
+    setActivePlayingId(null);
+    setVoiceNotice(null);
     setMessages([]);
     setStreamedText("");
     setCurrentBadge(null);
@@ -178,7 +344,7 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
     const iconColor = isEmerg ? "text-rose-400" : isUrgent ? "text-amber-400" : "text-teal-400";
 
     return (
-      <div className={`p-3.5 rounded-lg border mb-3.5 ${badgeBg} shadow-md`}>
+      <div className={`p-3.5 rounded-lg border mb-3.5 ${badgeBg} shadow-md space-y-2`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             {isEmerg ? (
@@ -195,16 +361,49 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
               <div className="text-sm font-bold mt-0.5">{badge.headline}</div>
             </div>
           </div>
-          {isEmerg && (
-            <a
-              href="tel:911"
-              className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold shrink-0 transition-colors shadow-sm"
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {isEmerg && (
+              <a
+                href="tel:1990"
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold shrink-0 transition-colors shadow-sm"
+              >
+                <PhoneCall className="w-3.5 h-3.5" />
+                Call 1990 / 911
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setBookingHeadline(badge.headline || "");
+                setBookingAcuity(badge.acuity || "ROUTINE");
+                setBookingSummary(`${badge.headline || "Clinical Triage"} (Acuity: ${badge.acuity})`);
+                setIsBookingModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold shrink-0 transition-colors shadow-sm cursor-pointer"
             >
-              <PhoneCall className="w-3.5 h-3.5" />
-              Call 911 / 1990
-            </a>
-          )}
+              <CalendarCheck className="w-3.5 h-3.5" />
+              <span>{language === "si" ? "වෛද්‍යවරයෙකු වෙන්කරන්න (Book)" : "Book Specialist (eChannelling / Doc990)"}</span>
+            </button>
+          </div>
         </div>
+
+        {/* Hybrid LLM & Pre-Transmission PHI Scrubber Telemetry Row */}
+        {(badge.llm_model || (badge.scrubbed_entities && badge.scrubbed_entities.length > 0)) && (
+          <div className="pt-2 border-t border-white/10 flex flex-wrap items-center gap-2 text-[10px]">
+            {badge.llm_model && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-950/70 border border-slate-700 text-slate-300 font-mono">
+                <Cpu className="w-3 h-3 text-teal-400" />
+                <span>Engine: {badge.llm_model}</span>
+              </span>
+            )}
+            {badge.scrubbed_entities && badge.scrubbed_entities.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-700 text-emerald-300 font-mono">
+                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                <span>PHI Scrubbed Pre-LLM: {badge.scrubbed_entities.join(", ")}</span>
+              </span>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -225,12 +424,54 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
               </span>
             </div>
             <div className="text-xs text-slate-400">
-              Protocolized Symptom Assessment & Federated Ontology Integration
+              Protocolized Symptom Assessment & Hybrid Cloud LLM + PHI Scrubber
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Hybrid Cloud LLM Connector Status & Settings Button */}
+          <button
+            onClick={() => setIsLlmModalOpen(true)}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
+              llmStatus?.cloud_llm_enabled
+                ? "bg-emerald-950/80 border-emerald-600 text-emerald-300 hover:bg-emerald-900/80"
+                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-teal-300"
+            }`}
+            title="Configure Hybrid Cloud LLM (Google Gemini 1.5 Pro, Claude 3.5 Sonnet, GPT-4o)"
+          >
+            <Cpu className="w-3.5 h-3.5 text-teal-400" />
+            <span className="hidden sm:inline">
+              {llmStatus?.cloud_llm_enabled
+                ? `Cloud LLM: ${llmStatus.active_model}`
+                : "Hybrid LLM: Local + NLU"}
+            </span>
+          </button>
+
+          {activePlayingId && (
+            <button
+              onClick={handleStopAllAudio}
+              className="px-2.5 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors animate-pulse"
+              title={t.voiceStopAudio}
+            >
+              <VolumeX className="w-3.5 h-3.5" />
+              <span>{t.voiceStopAudio}</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setAutoReadAloud((prev) => !prev)}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors ${
+              autoReadAloud
+                ? "bg-teal-950/90 border-teal-600 text-teal-300"
+                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400"
+            }`}
+            title={t.voiceAutoRead}
+          >
+            <Volume2 className={`w-3.5 h-3.5 ${autoReadAloud ? "text-teal-400" : "text-slate-400"}`} />
+            <span>{t.voiceAutoRead}</span>
+          </button>
+
           {onOpenOntology && (
             <button
               onClick={onOpenOntology}
@@ -258,12 +499,12 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
               <Sparkles className="w-6 h-6" />
             </div>
             <h2 className="text-lg font-bold text-slate-100">
-              Clinical Conversational Triage
+              Clinical Conversational Triage (Hybrid Cloud LLM + Local RAG)
             </h2>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Describe your symptoms naturally in English or Sinhala. The triage engine will screen for
-              life-threatening red flags, ask targeted SOCRATES clarifying questions, and deliver evidence-grounded
-              assessments mapped to official WHO ICD-11 codes.
+              Describe your symptoms naturally in English, Sinhala, or Singlish. Patient identifiers (PHI) are
+              automatically scrubbed via HIPAA Safe Harbor before Hybrid LLM processing, and life-threatening red flags
+              are screened deterministically.
             </p>
             <div className="pt-2 flex flex-wrap justify-center gap-2">
               <button
@@ -290,6 +531,16 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
               >
                 Sinhala: "මට දින 3ක සිට තද උණ සහ ඇඟපත වේදනාව"
               </button>
+              <button
+                onClick={() =>
+                  handleSend(
+                    "Mage nama Kamal Perera, phone 077-123-4567. Mata dawas 3k idan thada una saha oluwe kakkuma wamanaya thiyenawa"
+                  )
+                }
+                className="text-xs px-3 py-1.5 rounded-full bg-teal-950/60 hover:bg-teal-900/60 border border-teal-800 text-teal-300 transition-colors"
+              >
+                Singlish + PHI Scrub Test: "Mage nama Kamal... dawas 3k idan thada una..."
+              </button>
             </div>
           </div>
         )}
@@ -300,9 +551,34 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
             key={msg.id}
             className={`flex flex-col ${msg.sender === "PATIENT" ? "items-end" : "items-start"}`}
           >
-            <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-400">
+            <div className="flex items-center justify-between w-full max-w-[85%] mb-1 text-[11px] text-slate-400">
               <span>{msg.sender === "PATIENT" ? "Patient Narrative" : "Clinical Assessment"}</span>
-              <span>{msg.timestamp}</span>
+              <div className="flex items-center gap-2">
+                {msg.sender === "CLINICIAN_ASSISTANT" && (
+                  <button
+                    onClick={() => handleToggleSpeak(msg.id, msg.content)}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                      activePlayingId === msg.id
+                        ? "bg-teal-950 text-teal-300 border border-teal-700 animate-pulse"
+                        : "hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                    }`}
+                    title={activePlayingId === msg.id ? t.voiceStopAudio : t.voicePlay}
+                  >
+                    {activePlayingId === msg.id ? (
+                      <>
+                        <VolumeX className="w-3 h-3 text-teal-400" />
+                        <span>{t.voiceStopAudio}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-3 h-3 text-slate-400" />
+                        <span>{t.voicePlay}</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                <span>{msg.timestamp}</span>
+              </div>
             </div>
 
             <div
@@ -435,6 +711,13 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
 
       {/* Input Form Bar */}
       <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0">
+        {voiceNotice && (
+          <div className="mb-2.5 px-3 py-1.5 rounded bg-teal-950/80 border border-teal-700/60 text-teal-300 text-xs flex items-center gap-2">
+            <Radio className="w-3.5 h-3.5 animate-pulse text-teal-400 shrink-0" />
+            <span className="truncate">{voiceNotice}</span>
+          </div>
+        )}
+
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -442,15 +725,50 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           }}
           className="flex items-center gap-2"
         >
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+          <div className="relative flex-1">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              disabled={isStreaming}
+              placeholder={
+                isListening
+                  ? t.voiceListening
+                  : "Type clinical symptoms, onset, character, or questions in English or Sinhala..."
+              }
+              className={`w-full bg-slate-950 border rounded-lg px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none transition-all disabled:opacity-50 ${
+                isListening
+                  ? "border-rose-500 ring-1 ring-rose-500/50 pr-24"
+                  : "border-slate-700 focus:border-teal-500"
+              }`}
+            />
+            {isListening && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[10px] text-rose-400 font-mono bg-rose-950/90 px-2 py-0.5 rounded border border-rose-800 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                REC {language === "si" ? "SI" : "EN"}
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleVoiceInput}
             disabled={isStreaming}
-            placeholder="Type clinical symptoms, onset, character, or questions in English or Sinhala..."
-            className="flex-1 bg-slate-950 border border-slate-700 focus:border-teal-500 rounded-lg px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none transition-colors disabled:opacity-50"
-          />
+            className={`p-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shrink-0 ${
+              isListening
+                ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-900/40 animate-pulse"
+                : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700 hover:border-slate-600"
+            }`}
+            title={isListening ? t.voiceStop : t.voiceInputTooltip}
+          >
+            {isListening ? (
+              <MicOff className="w-4 h-4 text-white" />
+            ) : (
+              <Mic className="w-4 h-4 text-teal-400" />
+            )}
+          </button>
+
           <button
             type="submit"
             disabled={!inputText.trim() || isStreaming}
@@ -516,6 +834,129 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           </div>
         </div>
       )}
+
+      {/* Hybrid Cloud LLM Configuration Modal */}
+      {isLlmModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl text-xs">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-teal-400" />
+                <span className="text-sm font-bold text-slate-100">
+                  Hybrid Cloud LLM & PHI Scrubber Connector
+                </span>
+              </div>
+              <button
+                onClick={() => setIsLlmModalOpen(false)}
+                className="text-slate-400 hover:text-slate-200 font-bold"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="p-3 rounded-lg bg-emerald-950/50 border border-emerald-800/70 text-emerald-200 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>HIPAA Safe Harbor PHI Scrubber Enforced Pre-Transmission</span>
+              </div>
+              <p className="text-[11px] text-emerald-300/80 leading-relaxed">
+                All patient names, NIC/SSN numbers, phone numbers, emails, and dates of birth (in English, Sinhala, and
+                Singlish) are deterministically scrubbed BEFORE any Cloud LLM call. If no cloud API key is set or
+                network is offline, the system automatically falls back to the 100% Local Deterministic Clinical Engine.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveLlmConfig} className="space-y-3">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Active Hybrid Inference Mode
+                </label>
+                <select
+                  value={selectedProvider}
+                  onChange={(e) => setSelectedProvider(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-teal-500"
+                >
+                  <option value="auto">Auto (Use Configured Cloud LLM or Local Fallback)</option>
+                  <option value="gemini">Google Gemini 1.5 Pro (gemini-1.5-pro)</option>
+                  <option value="anthropic">Anthropic Claude 3.5 Sonnet (claude-3-5-sonnet-20241022)</option>
+                  <option value="openai">OpenAI GPT-4o (gpt-4o)</option>
+                  <option value="local">100% Local Deterministic RAG + Singlish NLU Only</option>
+                </select>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <div>
+                  <label className="block text-slate-400 text-[11px] mb-1">
+                    Google Gemini API Key {llmStatus?.providers_configured?.gemini && "(Configured ✓)"}
+                  </label>
+                  <input
+                    type="password"
+                    value={geminiKey}
+                    onChange={(e) => setGeminiKey(e.target.value)}
+                    placeholder="AIzaSy... (Leave blank to keep existing)"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-[11px] mb-1">
+                    Anthropic Claude API Key {llmStatus?.providers_configured?.anthropic && "(Configured ✓)"}
+                  </label>
+                  <input
+                    type="password"
+                    value={anthropicKey}
+                    onChange={(e) => setAnthropicKey(e.target.value)}
+                    placeholder="sk-ant-... (Leave blank to keep existing)"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 text-[11px] mb-1">
+                    OpenAI GPT-4o API Key {llmStatus?.providers_configured?.openai && "(Configured ✓)"}
+                  </label>
+                  <input
+                    type="password"
+                    value={openaiKey}
+                    onChange={(e) => setOpenaiKey(e.target.value)}
+                    placeholder="sk-proj-... (Leave blank to keep existing)"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                <span className="text-[11px] text-slate-400 font-mono">
+                  Active: {llmStatus?.active_model || "MedGuard-Local-Deterministic-RAG"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsLlmModalOpen(false)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingLlmConfig}
+                    className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold cursor-pointer"
+                  >
+                    {savingLlmConfig ? "Applying..." : "Apply Hybrid Config"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Telemedicine & Specialist Doctor Appointment Booking Modal */}
+      <AppointmentBookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        specialtyHint={bookingHeadline}
+        clinicalContext={bookingSummary}
+        triageAcuity={bookingAcuity}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldCheck, Activity, Brain, BarChart3, Database, Globe, Layers, FileText } from "lucide-react";
+import { ShieldCheck, Activity, Brain, BarChart3, Database, Globe, Layers, FileText, ClipboardList, CalendarCheck } from "lucide-react";
 import { useLanguage } from "@/lib/LanguageContext";
 
 export function NavigationHeader() {
@@ -11,8 +11,10 @@ export function NavigationHeader() {
 
   const navLinks = [
     { href: "/", label: t.navTriage, icon: Activity },
-    { href: "/reports", label: language === "si" ? "වෛද්‍ය වාර්තා" : "Lab Reports", icon: FileText },
-    { href: "/knowledge", label: language === "si" ? "ICD-11 නාමාවලිය" : "ICD-11 Ontology", icon: Layers },
+    { href: "/reports", label: t.navReports, icon: FileText },
+    { href: "/telemedicine", label: t.navTelemedicine, icon: CalendarCheck },
+    { href: "/records", label: t.navRecords, icon: ClipboardList },
+    { href: "/knowledge", label: t.navOntology, icon: Layers },
     { href: "/rlhf", label: t.navRLHF, icon: Brain },
     { href: "/analytics", label: t.navAnalytics, icon: BarChart3 },
     { href: "/evaluation", label: t.navEvaluation, icon: ShieldCheck },

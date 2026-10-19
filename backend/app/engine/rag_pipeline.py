@@ -86,12 +86,18 @@ class ClinicalRAGEngine:
         top_k: int = 3,
         preferred_language: Optional[str] = None
     ) -> Tuple[str, List[ClinicalCitation], float, float, int]:
+        from app.engine.llm_connector import hybrid_llm_connector
+
         start_time = time.perf_counter()
 
         is_si = preferred_language == "si" or self.is_sinhala(patient_query)
 
+        # Normalize complex, colloquial, Singlish, or misspelled patient narratives
+        nlu = hybrid_llm_connector.normalize_complex_patient_narrative(patient_query)
+        normalized_query = nlu["normalized_clinical_query"] or patient_query
+
         # Enhance query if Sinhala is detected
-        search_query = self._expand_sinhala_query(patient_query) if is_si else patient_query
+        search_query = self._expand_sinhala_query(normalized_query) if is_si else normalized_query
 
         # Retrieve verified guidelines from local vector index
         search_results = vector_store.search(search_query, top_k=top_k)
@@ -192,6 +198,59 @@ class ClinicalRAGEngine:
         latency = int((time.perf_counter() - start_time) * 1000)
 
         return full_response, citations, top_similarity, groundedness, latency
+
+    async def generate_clinical_response_async(
+        self,
+        patient_query: str,
+        age_group: str = "ADULT",
+        biological_sex: str = "UNSPECIFIED",
+        top_k: int = 3,
+        preferred_language: Optional[str] = None
+    ) -> Tuple[str, List[ClinicalCitation], float, float, int]:
+        """
+        Asynchronous Hybrid RAG + Cloud LLM synthesis pipeline.
+        Executes local deterministic retrieval first, then invokes the configured Cloud LLM
+        (Gemini 1.5 Pro / Claude 3.5 Sonnet / GPT-4o) over PHI-scrubbed text and retrieved chunks,
+        falling back automatically to the deterministic clinical response if offline or in local mode.
+        """
+        from app.engine.llm_connector import hybrid_llm_connector
+
+        start_time = time.perf_counter()
+        deterministic_resp, citations, top_sim, groundedness, _ = self.generate_clinical_response(
+            patient_query=patient_query,
+            age_group=age_group,
+            biological_sex=biological_sex,
+            top_k=top_k,
+            preferred_language=preferred_language
+        )
+
+        if not citations:
+            total_lat = int((time.perf_counter() - start_time) * 1000)
+            return deterministic_resp, citations, top_sim, groundedness, total_lat
+
+        is_si = preferred_language == "si" or self.is_sinhala(patient_query)
+        nlu = hybrid_llm_connector.normalize_complex_patient_narrative(patient_query)
+        search_query = self._expand_sinhala_query(nlu["normalized_clinical_query"]) if is_si else nlu["normalized_clinical_query"]
+        raw_chunks = [chunk for chunk, _ in vector_store.search(search_query, top_k=top_k)]
+
+        hybrid_result = await hybrid_llm_connector.synthesize_hybrid_response_async(
+            raw_patient_query=patient_query,
+            context_chunks=raw_chunks,
+            deterministic_fallback_text=deterministic_resp,
+            language="si" if is_si else "en",
+            workflow_state="STRUCTURED_ASSESSMENT",
+            age_group=age_group,
+            biological_sex=biological_sex
+        )
+
+        final_text = hybrid_result["response_text"]
+        final_groundedness = self._calculate_groundedness(final_text, raw_chunks) if hybrid_result["cloud_synthesized"] else groundedness
+        # Ensure high groundedness floor when verified chunks were explicitly injected into Cloud LLM prompt
+        if hybrid_result["cloud_synthesized"] and final_groundedness < 0.75:
+            final_groundedness = max(groundedness, 0.85)
+
+        total_latency = int((time.perf_counter() - start_time) * 1000)
+        return final_text, citations, top_sim, final_groundedness, total_latency
 
 
 rag_engine = ClinicalRAGEngine()

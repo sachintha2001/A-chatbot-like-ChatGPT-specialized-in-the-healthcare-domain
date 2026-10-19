@@ -11,7 +11,12 @@ import {
   Activity,
   Layers,
   Sparkles,
-  Zap
+  Zap,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Radio
 } from "lucide-react";
 import {
   TriageSession,
@@ -26,6 +31,11 @@ import { CitationDrawer } from "@/components/CitationDrawer";
 import { StreamingChatView } from "@/components/chat/StreamingChatView";
 import { OntologyBrowserModal } from "@/components/chat/OntologyBrowserModal";
 import { useLanguage } from "@/lib/LanguageContext";
+import {
+  clinicalVoicePlayer,
+  ClinicalSpeechRecognizer,
+  isSpeechRecognitionSupported
+} from "@/lib/voice";
 
 export default function ClinicalTriagePage() {
   const { language, t } = useLanguage();
@@ -41,7 +51,76 @@ export default function ClinicalTriagePage() {
   const [activeCitation, setActiveCitation] = useState<ClinicalCitation | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Legacy Voice Engine States
+  const [activePlayingId, setActivePlayingId] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const recognizerRef = useRef<ClinicalSpeechRecognizer | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      recognizerRef.current?.stop();
+      clinicalVoicePlayer.stop();
+    };
+  }, []);
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      recognizerRef.current?.stop();
+      setIsListening(false);
+      setVoiceNotice(null);
+      return;
+    }
+
+    if (!isSpeechRecognitionSupported()) {
+      setVoiceNotice(t.voiceNotSupported);
+      setTimeout(() => setVoiceNotice(null), 4000);
+      return;
+    }
+
+    setVoiceNotice(t.voiceListening);
+    const recognizer = new ClinicalSpeechRecognizer({
+      language,
+      onResult: (transcript, isFinal) => {
+        if (isFinal) {
+          setInputText((prev) => (prev ? `${prev.trim()} ${transcript}` : transcript));
+        } else {
+          setVoiceNotice(`${t.voiceListening}: "${transcript}"`);
+        }
+      },
+      onError: (err) => {
+        setIsListening(false);
+        setVoiceNotice(t.voicePermissionError);
+        setTimeout(() => setVoiceNotice(null), 5000);
+      },
+      onEnd: () => {
+        setIsListening(false);
+        setTimeout(() => setVoiceNotice(null), 1500);
+      }
+    });
+
+    const started = recognizer.start();
+    if (started) {
+      recognizerRef.current = recognizer;
+      setIsListening(true);
+    }
+  };
+
+  const handleToggleSpeak = (msgId: string, content: string) => {
+    if (activePlayingId === msgId) {
+      clinicalVoicePlayer.stop();
+      setActivePlayingId(null);
+    } else {
+      setActivePlayingId(msgId);
+      clinicalVoicePlayer.speak(msgId, content, language, {
+        onStart: () => setActivePlayingId(msgId),
+        onEnd: () => setActivePlayingId(null),
+        onError: () => setActivePlayingId(null)
+      });
+    }
+  };
 
   useEffect(() => {
     if (activeMode === "LEGACY" && !session) {
@@ -274,12 +353,37 @@ export default function ClinicalTriagePage() {
                   key={msg.message_id}
                   className={`flex flex-col ${isPatient ? "items-end" : "items-start"}`}
                 >
-                  <div className="flex items-center space-x-2 mb-1 text-[11px] text-slate-500">
-                    <span className="font-semibold">
-                      {isPatient ? t.patientNarrativeHeader : t.assistantHeader}
-                    </span>
-                    <span>•</span>
-                    <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <div className="flex items-center justify-between w-full max-w-[85%] mb-1 text-[11px] text-slate-500">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold">
+                        {isPatient ? t.patientNarrativeHeader : t.assistantHeader}
+                      </span>
+                      <span>•</span>
+                      <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                    </div>
+                    {!isPatient && (
+                      <button
+                        onClick={() => handleToggleSpeak(msg.message_id, msg.redacted_content)}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                          activePlayingId === msg.message_id
+                            ? "bg-teal-100 text-teal-800 border border-teal-300 animate-pulse"
+                            : "hover:bg-slate-200 text-slate-600"
+                        }`}
+                        title={activePlayingId === msg.message_id ? t.voiceStopAudio : t.voicePlay}
+                      >
+                        {activePlayingId === msg.message_id ? (
+                          <>
+                            <VolumeX className="w-3 h-3 text-rose-600" />
+                            <span>{t.voiceStopAudio}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-3 h-3 text-teal-600" />
+                            <span>{t.voicePlay}</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   <div
@@ -345,6 +449,13 @@ export default function ClinicalTriagePage() {
 
           {/* Input Controls */}
           <div className="bg-slate-50 border-t border-slate-200 p-3.5 shrink-0">
+            {voiceNotice && (
+              <div className="mb-2.5 px-3 py-1.5 rounded bg-teal-50 border border-teal-200 text-teal-800 text-xs flex items-center gap-2">
+                <Radio className="w-3.5 h-3.5 animate-pulse text-teal-600 shrink-0" />
+                <span className="truncate">{voiceNotice}</span>
+              </div>
+            )}
+
             {errorMessage && (
               <div className="mb-2 p-2.5 bg-red-50 border border-red-200 text-red-700 rounded text-xs flex items-center space-x-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -359,18 +470,49 @@ export default function ClinicalTriagePage() {
               }}
               className="flex space-x-2"
             >
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  disabled={loading || !session}
+                  placeholder={
+                    isListening
+                      ? t.voiceListening
+                      : session
+                      ? t.inputPlaceholderReady
+                      : t.inputPlaceholderConsent
+                  }
+                  className={`w-full bg-white border rounded px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 shadow-2xs transition-all ${
+                    isListening ? "border-rose-500 ring-1 ring-rose-400 pr-20" : "border-slate-300"
+                  }`}
+                />
+                {isListening && (
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] text-rose-600 font-mono bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+                    REC
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
                 disabled={loading || !session}
-                placeholder={
-                  session
-                    ? t.inputPlaceholderReady
-                    : t.inputPlaceholderConsent
-                }
-                className="flex-1 bg-white border border-slate-300 rounded px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 shadow-2xs"
-              />
+                className={`px-3 py-2 rounded text-xs font-semibold flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shrink-0 border ${
+                  isListening
+                    ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-600 animate-pulse"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
+                }`}
+                title={isListening ? t.voiceStop : t.voiceInputTooltip}
+              >
+                {isListening ? (
+                  <MicOff className="w-3.5 h-3.5 text-white" />
+                ) : (
+                  <Mic className="w-3.5 h-3.5 text-teal-600" />
+                )}
+              </button>
+
               <button
                 type="submit"
                 disabled={loading || !session || !inputText.trim()}

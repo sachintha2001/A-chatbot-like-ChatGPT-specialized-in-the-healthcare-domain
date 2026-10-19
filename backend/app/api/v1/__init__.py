@@ -9,6 +9,9 @@ from app.api.v1.fhir import router as fhir_router
 from app.api.v1.knowledge import router as knowledge_router
 from app.api.v1.chat_stream import router as chat_stream_router
 from app.api.v1.reports import router as reports_router
+from app.api.v1.patient import router as patient_router
+from app.api.v1.voice import router as voice_router
+from app.api.v1.telemedicine import router as telemedicine_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(auth_router)
@@ -21,5 +24,8 @@ api_v1_router.include_router(fhir_router)
 api_v1_router.include_router(knowledge_router)
 api_v1_router.include_router(chat_stream_router)
 api_v1_router.include_router(reports_router)
+api_v1_router.include_router(patient_router)
+api_v1_router.include_router(voice_router)
+api_v1_router.include_router(telemedicine_router)
 
 __all__ = ["api_v1_router"]

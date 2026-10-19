@@ -166,9 +166,11 @@ async def process_triage_prompt(
     )
     session.add(patient_msg)
 
-    # 3. Deterministic Pre-Inference Red-Flag Triage Evaluation
+    # 3. Deterministic Pre-Inference Red-Flag Triage Evaluation (including normalized Singlish/typo tokens)
+    from app.engine.llm_connector import hybrid_llm_connector
+    nlu_info = hybrid_llm_connector.normalize_complex_patient_narrative(redacted_prompt)
     is_emergency, matched_flags, directive, hotlines = red_flag_detector.evaluate(
-        redacted_prompt, preferred_language=payload.language
+        nlu_info["normalized_clinical_query"] or redacted_prompt, preferred_language=payload.language
     )
 
     if is_emergency:
@@ -243,8 +245,8 @@ async def process_triage_prompt(
             created_at=assistant_msg.created_at.isoformat()
         )
 
-    # 4. If not emergency, invoke Evidence-Grounded RAG Pipeline
-    response_text, citations, similarity_score, groundedness_score, rag_latency = rag_engine.generate_clinical_response(
+    # 4. If not emergency, invoke Evidence-Grounded Hybrid RAG + Cloud LLM Pipeline
+    response_text, citations, similarity_score, groundedness_score, rag_latency = await rag_engine.generate_clinical_response_async(
         patient_query=redacted_prompt,
         age_group=triage_sess.patient_age_group,
         biological_sex=triage_sess.biological_sex,
