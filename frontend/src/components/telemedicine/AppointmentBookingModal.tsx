@@ -188,26 +188,26 @@ export function AppointmentBookingModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden my-6 max-h-[92vh] flex flex-col text-slate-100">
+    <div className="fixed inset-0 z-50 bg-[#0A2540]/65 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-[#CBE2EA] rounded-2xl max-w-3xl w-full shadow-clinical-elevated overflow-hidden my-6 max-h-[92vh] flex flex-col text-slate-100">
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div className="clinical-dark-preserve px-6 py-4 bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] border-b border-teal-500/30 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/40 flex items-center justify-center text-teal-400">
+            <div className="w-10 h-10 rounded-xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300">
               <Stethoscope className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
+              <div className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                 <span>
                   {isSi
                     ? "විශේෂඥ වෛද්‍ය හමුවක් වෙන්කරවා ගැනීම (eChannelling / Doc990 / oDoc)"
                     : "Specialist Doctor & Telemedicine Appointment Booking"}
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-700">
+                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-200 border border-teal-300/40">
                   SLMC Verified
                 </span>
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-cyan-100/80">
                 {matchedSpecialtyLabel
                   ? `${isSi ? "නිර්දේශිත වෛද්‍ය අංශය:" : "Matched Specialty:"} ${matchedSpecialtyLabel}`
                   : isSi
@@ -219,11 +219,12 @@ export function AppointmentBookingModal({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-cyan-100 hover:text-white border border-white/20 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
+
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -260,10 +261,10 @@ export function AppointmentBookingModal({
                       <div className="text-[11px] font-mono uppercase tracking-wider text-emerald-300 font-bold">
                         {isSi ? "වෛද්‍ය හමුව තහවුරු කරන ලදී" : "Appointment Reservation Confirmed"}
                       </div>
-                      <h3 className="text-base font-bold text-white">
+                      <h3 className="text-base font-bold text-slate-100">
                         {isSi ? confirmedBooking.doctor.full_name_si : confirmedBooking.doctor.full_name_en}
                       </h3>
-                      <p className="text-xs text-emerald-200/90">
+                      <p className="text-xs text-emerald-300">
                         {isSi ? confirmedBooking.doctor.specialty_si : confirmedBooking.doctor.specialty_en} •{" "}
                         {confirmedBooking.doctor.slmc_reg_no}
                       </p>
@@ -271,10 +272,11 @@ export function AppointmentBookingModal({
                   </div>
                   <div className="text-right font-mono">
                     <div className="text-[10px] text-emerald-300 uppercase">Booking Ref</div>
-                    <div className="text-sm font-bold text-white bg-slate-950/80 px-2.5 py-1 rounded border border-emerald-600">
+                    <div className="text-sm font-bold text-slate-100 bg-slate-950/80 px-2.5 py-1 rounded border border-emerald-600">
                       {confirmedBooking.booking_reference}
                     </div>
                   </div>
+
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-emerald-800/60 text-xs">

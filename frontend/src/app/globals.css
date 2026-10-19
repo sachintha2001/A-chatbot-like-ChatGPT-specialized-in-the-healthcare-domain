@@ -3,54 +3,303 @@
 @tailwind utilities;
 
 :root {
-  --background: #F8FAFC;
-  --foreground: #0F172A;
+  --background: #EEF6F9;
+  --foreground: #0A2540;
   --clinical-teal: #0D9488;
-  --clinical-navy: #0F172A;
+  --clinical-teal-hover: #0F766E;
+  --clinical-cerulean: #0284C7;
+  --clinical-navy: #0A2540;
+  --clinical-surface: #FFFFFF;
+  --clinical-ice: #F2F9FB;
+  --clinical-border: #CBE2EA;
 }
 
 body {
   background-color: var(--background);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(2, 132, 199, 0.08) 0px, transparent 50%),
+    linear-gradient(180deg, #EAF4F8 0%, #F4F9FB 45%, #EEF6F9 100%);
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+body.medical-nightward-theme {
+  --background: #071324;
+  --foreground: #F1F5F9;
+  background-color: #071324;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.14) 0px, transparent 55%),
+    radial-gradient(at 100% 0%, rgba(2, 132, 199, 0.14) 0px, transparent 55%);
+  color: #F1F5F9;
+}
+
+/* Medical Hero Gradient Banner */
+.clinical-hero-banner {
+  background: linear-gradient(135deg, #0A2540 0%, #0E3A5D 52%, #0D7490 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  box-shadow: 0 10px 28px -6px rgba(10, 37, 64, 0.18);
+}
+
+/* Subtle ECG Grid Pattern Overlay for Medical Headers */
+.clinical-ecg-grid {
+  background-image:
+    linear-gradient(to right, rgba(13, 148, 136, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(13, 148, 136, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
 /* Clinical Table & Data Density Formatting */
 .clinical-table th {
-  background-color: #F1F5F9;
-  color: #334155;
+  background-color: #EBF5F8;
+  color: #0A2540;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.625rem 0.875rem;
-  border-bottom: 1px solid #CBD5E1;
+  border-bottom: 1px solid #CBE2EA;
 }
 
 .clinical-table td {
   padding: 0.75rem 0.875rem;
   font-size: 0.875rem;
-  color: #1E293B;
-  border-bottom: 1px solid #E2E8F0;
+  color: #1E3A5F;
+  border-bottom: 1px solid #E2F0F5;
 }
 
 /* Clinical Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #F1F5F9;
+  background: #E8F3F7;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 3px;
+  background: #9CC5D3;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: #0D9488;
 }
+
+/* ============================================================================
+   CLINICAL DAYLIGHT MEDICAL PALETTE HARMONIZATION
+   Ensures all clinical cards, modals, laboratory tables, and diagnostic panels
+   render in a cohesive, high-contrast Medical Daylight palette (#FFFFFF cards,
+   #F2F9FB clinical ice wells, #0A2540 deep hospital navy typography, and
+   #0D9488 / #0284C7 medical teal & cerulean accents) while preserving live
+   camera viewfinders (.camera-viewfinder-dark) and dark compliance ribbons.
+   ============================================================================ */
+body.medical-daylight-theme :not(.camera-viewfinder-dark):not(.camera-viewfinder-dark *):not(.clinical-dark-preserve):not(.clinical-dark-preserve *) {
+  /* Primary & Secondary Clinical Surfaces */
+  &.bg-slate-950,
+  &.bg-slate-950\/95,
+  &.bg-slate-950\/90,
+  &.bg-slate-950\/80,
+  &.bg-slate-950\/70,
+  &.bg-slate-950\/60,
+  &.bg-slate-950\/50,
+  &.bg-slate-950\/40 {
+    background-color: #FFFFFF !important;
+  }
+
+  &.bg-slate-900,
+  &.bg-slate-900\/90,
+  &.bg-slate-900\/80,
+  &.bg-slate-900\/70,
+  &.bg-slate-900\/60,
+  &.bg-slate-900\/50,
+  &.bg-slate-900\/40 {
+    background-color: #F2F9FB !important;
+  }
+
+  &.bg-slate-800,
+  &.bg-slate-800\/80,
+  &.bg-slate-800\/60,
+  &.bg-slate-800\/50,
+  &.bg-slate-800\/40 {
+    background-color: #E4F2F6 !important;
+  }
+
+  /* Clinical Borders */
+  &.border-slate-800,
+  &.border-slate-800\/80,
+  &.border-slate-800\/60,
+  &.border-slate-700,
+  &.border-slate-700\/80,
+  &.border-slate-700\/60 {
+    border-color: #C9E2EC !important;
+  }
+
+  &.divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+  &.divide-slate-800\/70 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #DCEEF4 !important;
+  }
+
+  /* Clinical Typography */
+  &.text-slate-100,
+  &.text-slate-200 {
+    color: #0A2540 !important;
+  }
+
+  &.text-slate-300 {
+    color: #243B53 !important;
+  }
+
+  &.text-slate-400 {
+    color: #486581 !important;
+  }
+
+  &.text-slate-500 {
+    color: #627D98 !important;
+  }
+
+  /* Medical Teal Surfaces & Accents */
+  &.bg-teal-950,
+  &.bg-teal-950\/90,
+  &.bg-teal-950\/80,
+  &.bg-teal-950\/60,
+  &.bg-teal-950\/50,
+  &.bg-teal-950\/40,
+  &.bg-teal-950\/30,
+  &.bg-teal-950\/25,
+  &.bg-teal-950\/20,
+  &.bg-teal-900\/60,
+  &.bg-teal-900\/40,
+  &.bg-teal-900\/30 {
+    background-color: #E6FFFA !important;
+    border-color: #81E6D9 !important;
+  }
+
+  &.text-teal-200,
+  &.text-teal-300,
+  &.text-teal-400 {
+    color: #0F766E !important;
+  }
+
+  &.border-teal-800,
+  &.border-teal-800\/60,
+  &.border-teal-700,
+  &.border-teal-700\/60,
+  &.border-teal-700\/50 {
+    border-color: #5EEAD4 !important;
+  }
+
+  /* Clinical Normal / Emerald Surfaces */
+  &.bg-emerald-950,
+  &.bg-emerald-950\/80,
+  &.bg-emerald-950\/60,
+  &.bg-emerald-950\/50,
+  &.bg-emerald-950\/40,
+  &.bg-emerald-950\/30,
+  &.bg-emerald-950\/25,
+  &.bg-emerald-950\/20,
+  &.bg-emerald-900\/40 {
+    background-color: #ECFDF5 !important;
+    border-color: #6EE7B7 !important;
+  }
+
+  &.text-emerald-200,
+  &.text-emerald-300,
+  &.text-emerald-400 {
+    color: #047857 !important;
+  }
+
+  &.border-emerald-800,
+  &.border-emerald-800\/60,
+  &.border-emerald-700,
+  &.border-emerald-700\/50 {
+    border-color: #6EE7B7 !important;
+  }
+
+  /* Clinical Critical / Emergency Rose Surfaces */
+  &.bg-rose-950,
+  &.bg-rose-950\/80,
+  &.bg-rose-950\/60,
+  &.bg-rose-950\/50,
+  &.bg-rose-950\/40,
+  &.bg-rose-950\/30,
+  &.bg-rose-950\/25,
+  &.bg-rose-950\/20,
+  &.bg-rose-900\/60,
+  &.bg-rose-900\/40 {
+    background-color: #FFF1F2 !important;
+    border-color: #FDA4AF !important;
+  }
+
+  &.text-rose-200,
+  &.text-rose-300,
+  &.text-rose-400 {
+    color: #BE123C !important;
+  }
+
+  &.border-rose-800,
+  &.border-rose-800\/60,
+  &.border-rose-700,
+  &.border-rose-700\/60 {
+    border-color: #FDA4AF !important;
+  }
+
+  /* Clinical Caution / Urgent Amber Surfaces */
+  &.bg-amber-950,
+  &.bg-amber-950\/80,
+  &.bg-amber-950\/60,
+  &.bg-amber-950\/50,
+  &.bg-amber-950\/40,
+  &.bg-amber-950\/30,
+  &.bg-amber-950\/25,
+  &.bg-amber-950\/20 {
+    background-color: #FFFBEB !important;
+    border-color: #FCD34D !important;
+  }
+
+  &.text-amber-200,
+  &.text-amber-300,
+  &.text-amber-400 {
+    color: #B45309 !important;
+  }
+
+  &.border-amber-800,
+  &.border-amber-800\/60,
+  &.border-amber-700,
+  &.border-amber-700\/60 {
+    border-color: #FCD34D !important;
+  }
+
+  /* Clinical Cerulean / Indigo Diagnostic Surfaces */
+  &.bg-indigo-950,
+  &.bg-indigo-950\/80,
+  &.bg-indigo-950\/60,
+  &.bg-indigo-950\/40,
+  &.bg-indigo-950\/30,
+  &.bg-indigo-950\/25,
+  &.bg-indigo-950\/20,
+  &.bg-indigo-900\/60,
+  &.bg-indigo-900\/40 {
+    background-color: #F0F9FF !important;
+    border-color: #7DD3FC !important;
+  }
+
+  &.text-indigo-200,
+  &.text-indigo-300,
+  &.text-indigo-400 {
+    color: #0369A1 !important;
+  }
+
+  &.border-indigo-800,
+  &.border-indigo-800\/50,
+  &.border-indigo-700,
+  &.border-indigo-700\/60 {
+    border-color: #7DD3FC !important;
+  }
+}
+

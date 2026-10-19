@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
+from fastapi.responses import Response
 
 from app.engine.report_analyzer import report_analyzer
 from app.knowledge.lab_biomarkers import CLINICAL_BIOMARKER_REGISTRY
@@ -13,6 +14,12 @@ class ReportTextAnalysisRequest(BaseModel):
     patient_age_group: Optional[str] = "ADULT"
     biological_sex: Optional[str] = "UNSPECIFIED"
     language: Optional[str] = "en"
+
+
+class ExportSummaryPdfRequest(BaseModel):
+    analysis_result: Dict[str, Any]
+    patient_name: Optional[str] = "Patient / Walk-in"
+    patient_age_sex: Optional[str] = "Adult / Unspecified"
 
 
 SAMPLE_CLINICAL_REPORTS = [
@@ -359,3 +366,34 @@ async def get_sample_reports():
     return {
         "samples": SAMPLE_CLINICAL_REPORTS
     }
+
+
+@router.post("/export-summary-pdf")
+async def export_clinical_summary_pdf(payload: ExportSummaryPdfRequest):
+    """
+    Generates an official, downloadable PDF 1.4 Medical Assessment & Physician Handover Report
+    including all tested biomarkers, High/Low flags, correlated WHO ICD-11 codes, clinical directives,
+    and an official cryptographic verification seal stamp.
+    """
+    if not payload.analysis_result or not isinstance(payload.analysis_result, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Valid analysis_result object is required to generate the Medical Assessment PDF."
+        )
+
+    pdf_bytes, filename, ref_id = report_analyzer.generate_clinical_assessment_pdf(
+        analysis_result=payload.analysis_result,
+        patient_name=payload.patient_name or "Patient / Walk-in",
+        patient_age_sex=payload.patient_age_sex or "Adult / Unspecified",
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Report-Ref-Id": ref_id,
+            "Access-Control-Expose-Headers": "Content-Disposition, X-Report-Ref-Id",
+        },
+    )
+

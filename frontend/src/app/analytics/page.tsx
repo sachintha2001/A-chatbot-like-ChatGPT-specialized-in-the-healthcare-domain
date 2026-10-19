@@ -49,23 +49,26 @@ export default function AnalyticsDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 flex items-center justify-between shadow-xs">
-        <div>
-          <div className="flex items-center space-x-2">
-            <BarChart3 className="w-5 h-5 text-clinical-teal" />
-            <h1 className="text-base font-bold text-clinical-navy">
+      <div className="clinical-dark-preserve bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] border border-teal-500/30 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-clinical-elevated text-white">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300 shrink-0">
+            <BarChart3 className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold text-white">
               Epidemiological Analytics & Population Surveillance
             </h1>
+            <p className="text-xs text-cyan-100/80 mt-0.5 max-w-3xl">
+              Aggregated symptom patterns, clinical domain queries, intent categorization, and patient query length
+              distributions derived from anonymized encounter logs.
+            </p>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Aggregated symptom patterns, clinical domain queries, intent categorization, and patient query length
-            distributions derived from anonymized encounter logs.
-          </p>
         </div>
-        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-3 py-1 rounded border border-slate-200">
+        <span className="text-xs font-mono bg-white/10 text-teal-200 px-3 py-1.5 rounded-xl border border-teal-300/30">
           Cohort: All De-Identified Encounters
         </span>
       </div>
+
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

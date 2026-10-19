@@ -207,3 +207,34 @@ def test_multipage_pdf_and_batch_api_endpoints():
     assert len(batch_data["page_breakdown"]) == 2
     assert batch_data["total_parameters_tested"] == 4
 
+
+def test_export_clinical_summary_pdf_endpoint():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+
+    # First run the 6-page sample analysis to get a full analysis payload
+    analysis_resp = client.post("/api/v1/reports/analyze-sample-multipage-pdf?language=si")
+    assert analysis_resp.status_code == 200
+    analysis_result = analysis_resp.json()
+
+    # Export the official downloadable PDF report
+    pdf_resp = client.post(
+        "/api/v1/reports/export-summary-pdf",
+        json={
+            "analysis_result": analysis_result,
+            "patient_name": "K. A. Saman Perera",
+            "patient_age_sex": "48Y / Male",
+        },
+    )
+    assert pdf_resp.status_code == 200
+    assert pdf_resp.headers["content-type"] == "application/pdf"
+    assert "MedGuard_Clinical_Assessment_MGA-PDF-" in pdf_resp.headers["content-disposition"]
+    assert pdf_resp.headers["x-report-ref-id"].startswith("MGA-PDF-")
+
+    pdf_bytes = pdf_resp.content
+    assert pdf_bytes.startswith(b"%PDF-1.4")
+    assert b"OFFICIAL MEDGUARD CLINICAL AI VERIFICATION SEAL" in pdf_bytes
+    assert b"K. A. Saman Perera" in pdf_bytes
+    assert b"ICD-11" in pdf_bytes

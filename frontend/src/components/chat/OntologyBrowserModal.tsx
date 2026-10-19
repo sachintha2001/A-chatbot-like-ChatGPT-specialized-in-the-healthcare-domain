@@ -90,22 +90,22 @@ export function OntologyBrowserModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-50 bg-[#0A2540]/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-[#CBE2EA] rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-clinical-elevated overflow-hidden text-slate-100">
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div className="clinical-dark-preserve px-6 py-4 bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] border-b border-teal-500/30 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+            <div className="w-10 h-10 rounded-xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300">
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                WHO ICD-11 Multi-Specialty Clinical Knowledge Ontology
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800">
+              <div className="text-sm font-bold text-white flex items-center gap-2">
+                <span>WHO ICD-11 Multi-Specialty Clinical Knowledge Ontology</span>
+                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-200 border border-teal-300/40">
                   {pathologies.length} Verified Pathologies
                 </span>
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-cyan-100/80">
                 Authoritative Relational Disease Registry & Cardinal Clinical Signatures
               </div>
             </div>
@@ -113,11 +113,12 @@ export function OntologyBrowserModal({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 transition-colors"
+            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-cyan-100 hover:text-white border border-white/20 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
+
 
         {/* Search & Filter Bar */}
         <div className="p-4 bg-slate-900 border-b border-slate-800 flex flex-wrap gap-3 items-center shrink-0">

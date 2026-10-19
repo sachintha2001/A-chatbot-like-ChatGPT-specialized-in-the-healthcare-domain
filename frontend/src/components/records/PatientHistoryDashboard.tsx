@@ -412,45 +412,45 @@ export function PatientHistoryDashboard() {
       )}
 
       {/* Header & Profile Switcher Ribbon */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="p-1.5 bg-teal-50 text-teal-700 rounded-md">
-                <Activity className="w-5 h-5 text-clinical-teal" />
-              </span>
-              <h1 className="text-xl font-bold tracking-tight text-clinical-navy">
+      <div className="bg-white border border-[#CBE2EA] rounded-2xl overflow-hidden shadow-clinical-card">
+        <div className="clinical-dark-preserve px-5 py-4 bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-teal-500/30">
+          <div className="flex items-start gap-3">
+            <span className="w-10 h-10 bg-white/10 border border-teal-300/30 text-teal-300 rounded-xl flex items-center justify-center shrink-0">
+              <Activity className="w-5 h-5" />
+            </span>
+            <div>
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
                 {isSi
                   ? "රෝගී සෞඛ්‍ය ඉතිහාසය සහ ප්‍රවණතා විශ්ලේෂණය"
                   : "Longitudinal Health Records & Biomarker Trends"}
               </h1>
+              <p className="text-xs text-cyan-100/80 mt-0.5">
+                {isSi
+                  ? "පවුලේ සාමාජිකයන්ගේ රසායනාගාර වාර්තා, ඩෙංගු පට්ටිකා හෝ රුධිර සීනි ප්‍රවණතා සහ අඛණ්ඩ EHR ඉතිහාසය."
+                  : "Multi-profile longitudinal EHR tracking with mathematical trajectory tracking across verified clinical biomarkers."}
+              </p>
             </div>
-            <p className="text-xs text-clinical-muted mt-1">
-              {isSi
-                ? "පවුලේ සාමාජිකයන්ගේ රසායනාගාර වාර්තා, ඩෙංගු පට්ටිකා හෝ රුධිර සීනි ප්‍රවණතා සහ අඛණ්ඩ EHR ඉතිහාසය."
-                : "Multi-profile longitudinal EHR tracking with mathematical trajectory tracking across verified clinical biomarkers."}
-            </p>
           </div>
 
           <div className="flex items-center space-x-2">
             <button
               onClick={() => loadProfileData(selectedProfileId)}
               disabled={actionLoading}
-              className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-cyan-100 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl transition-colors cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${actionLoading ? "animate-spin" : ""}`} />
               {isSi ? "යාවත්කාලීන" : "Refresh"}
             </button>
             <button
               onClick={() => setShowAddRecordModal(true)}
-              className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white bg-clinical-teal hover:bg-clinical-teal-dark rounded-lg transition-colors shadow-xs"
+              className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-teal-500 hover:bg-teal-400 rounded-xl transition-colors shadow-sm cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5 mr-1" />
               {isSi ? "නව වාර්තාවක්" : "Add Record"}
             </button>
             <button
               onClick={() => setShowNewProfileModal(true)}
-              className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-clinical-navy bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-300"
+              className="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-white/15 hover:bg-white/25 rounded-xl transition-colors border border-white/25 cursor-pointer"
             >
               <User className="w-3.5 h-3.5 mr-1" />
               {isSi ? "නව සාමාජිකයෙක්" : "New Profile"}
@@ -459,7 +459,8 @@ export function PatientHistoryDashboard() {
         </div>
 
         {/* Family Member Profile Pills */}
-        <div className="pt-4 flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="p-4 bg-[#F4FAFC] flex items-center space-x-2 overflow-x-auto scrollbar-none">
+
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap mr-1">
             {isSi ? "සාමාජිකයා:" : "Profiles:"}
           </span>

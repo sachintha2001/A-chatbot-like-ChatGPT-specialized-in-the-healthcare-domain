@@ -10,24 +10,33 @@ const config: Config = {
     extend: {
       colors: {
         clinical: {
-          navy: "#0F172A",
-          slate: "#334155",
-          muted: "#64748B",
-          border: "#E2E8F0",
-          surface: "#F8FAFC",
+          navy: "#0A2540",
+          navyLight: "#10375C",
+          slate: "#2C4257",
+          muted: "#5A7184",
+          border: "#D5E6EC",
+          surface: "#F2F8FA",
+          ice: "#EBF5F8",
           panel: "#FFFFFF",
           teal: {
             DEFAULT: "#0D9488",
             hover: "#0F766E",
             light: "#F0FDFA",
-            border: "#99F6E4"
+            border: "#99F6E4",
+            deep: "#115E59"
+          },
+          cerulean: {
+            DEFAULT: "#0284C7",
+            hover: "#0369A1",
+            light: "#F0F9FF",
+            border: "#BAE6FD"
           }
         },
         severity: {
           routine: {
-            text: "#15803D",
-            bg: "#F0FDF4",
-            border: "#BBF7D0"
+            text: "#047857",
+            bg: "#ECFDF5",
+            border: "#A7F3D0"
           },
           urgent: {
             text: "#B45309",
@@ -41,12 +50,18 @@ const config: Config = {
           }
         }
       },
+      boxShadow: {
+        "clinical-card": "0 4px 20px -2px rgba(10, 37, 64, 0.06), 0 2px 6px -1px rgba(13, 148, 136, 0.04)",
+        "clinical-elevated": "0 12px 32px -4px rgba(10, 37, 64, 0.12), 0 4px 12px -2px rgba(13, 148, 136, 0.08)",
+        "clinical-glow": "0 0 0 3px rgba(13, 148, 136, 0.18)"
+      },
       fontFamily: {
         sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
-        mono: ["JetBrains Mono", "Courier New", "monospace"]
+        mono: ["JetBrains Mono", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"]
       }
     },
   },
   plugins: [],
 };
 export default config;
+
