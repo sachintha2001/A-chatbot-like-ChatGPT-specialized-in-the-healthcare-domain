@@ -270,9 +270,6 @@ export function CoverLandingPage({ onEnterSystem }: CoverLandingPageProps) {
                   <span className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
                     MedGuard Clinical AI
                   </span>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/30">
-                    CDSS v2.5 Enterprise
-                  </span>
                 </div>
                 <p className="text-xs text-cyan-200/80">
                   {isSi

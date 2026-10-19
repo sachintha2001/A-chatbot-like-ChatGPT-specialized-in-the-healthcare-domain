@@ -1,3 +1,4 @@
+import os
 import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
@@ -87,8 +88,6 @@ async def bootstrap_initial_state():
 
         await session.commit()
 
-
-import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

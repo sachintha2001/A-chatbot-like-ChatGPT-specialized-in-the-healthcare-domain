@@ -32,6 +32,7 @@ import { StreamingChatView } from "@/components/chat/StreamingChatView";
 import { OntologyBrowserModal } from "@/components/chat/OntologyBrowserModal";
 import { CoverLandingPage } from "@/components/CoverLandingPage";
 import { useLanguage } from "@/lib/LanguageContext";
+import { useUI } from "@/lib/UIContext";
 import {
   clinicalVoicePlayer,
   ClinicalSpeechRecognizer,
@@ -40,7 +41,7 @@ import {
 
 export default function ClinicalTriagePage() {
   const { language, t } = useLanguage();
-  const [showCoverPage, setShowCoverPage] = useState<boolean>(true);
+  const { isCoverPage: showCoverPage, setIsCoverPage: setShowCoverPage } = useUI();
   const [activeMode, setActiveMode] = useState<"STREAMING" | "LEGACY">("STREAMING");
   const [isOntologyOpen, setIsOntologyOpen] = useState(false);
 

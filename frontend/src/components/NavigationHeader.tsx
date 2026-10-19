@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -24,14 +24,18 @@ import {
   X,
   RefreshCw,
   FileWarning,
-  KeyRound
+  KeyRound,
+  Sparkles
 } from "lucide-react";
 import { useLanguage } from "@/lib/LanguageContext";
+import { useUI } from "@/lib/UIContext";
 import { fetchSecurityPosture, runSecuritySelfTest } from "@/lib/api";
 
 export function NavigationHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
+  const { setIsCoverPage } = useUI();
   const [clinicalTheme, setClinicalTheme] = useState<"DAYLIGHT" | "NIGHTWARD">("DAYLIGHT");
   const [showSecurityModal, setShowSecurityModal] = useState(false);
   const [securityPosture, setSecurityPosture] = useState<any>(null);
@@ -113,9 +117,19 @@ export function NavigationHeader() {
                 <span>1990 Suwa Seriya</span>
               </a>
 
-              <span className="bg-[#10375C] text-cyan-100 px-2.5 py-0.5 rounded-full text-[11px] font-mono border border-cyan-500/30 hidden xl:inline">
-                {t.clinicianBadge}
-              </span>
+              {/* Return to Cover Landing Page */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCoverPage(true);
+                  router.push("/");
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#10375C] hover:bg-[#164875] text-cyan-200 border border-teal-400/30 text-[11px] font-semibold transition-colors cursor-pointer"
+                title={language === "si" ? "මුල් පිටුවට පිවිසෙන්න (Cover Page)" : "Go to Cover Page"}
+              >
+                <Sparkles className="w-3 h-3 text-cyan-300" />
+                <span>{language === "si" ? "මුල් පිටුව" : "Cover Page"}</span>
+              </button>
 
               {/* Clinical Daylight / Ward Night Theme Switcher */}
               <button
@@ -169,7 +183,11 @@ export function NavigationHeader() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-2.5 gap-4">
             {/* Brand Emblem */}
-            <Link href="/" className="flex items-center space-x-3 shrink-0 group">
+            <Link
+              href="/"
+              onClick={() => setIsCoverPage(false)}
+              className="flex items-center space-x-3 shrink-0 group"
+            >
               <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#0D9488] via-[#0891B2] to-[#0284C7] flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
                 <HeartPulse className="w-5 h-5 text-white" />
                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-[8px] font-extrabold text-white">
@@ -180,9 +198,6 @@ export function NavigationHeader() {
                 <div className="flex items-center gap-1.5">
                   <span className="text-base sm:text-lg font-extrabold tracking-tight text-[#0A2540] leading-tight">
                     {t.appTitle}
-                  </span>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">
-                    CDSS v2.5
                   </span>
                 </div>
                 <span className="text-[10px] text-[#486581] uppercase tracking-wider font-semibold block">
@@ -200,6 +215,11 @@ export function NavigationHeader() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={() => {
+                      if (item.href === "/") {
+                        setIsCoverPage(false);
+                      }
+                    }}
                     className={`inline-flex items-center px-3 py-2 text-xs rounded-xl transition-all shrink-0 ${
                       isActive
                         ? "bg-gradient-to-r from-teal-600 to-cyan-700 text-white font-bold shadow-sm"
