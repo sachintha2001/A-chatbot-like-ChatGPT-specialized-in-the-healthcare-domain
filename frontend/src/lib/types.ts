@@ -314,4 +314,91 @@ export interface SampleReportItem {
   sample_text: string;
 }
 
+export type PatientRelationship = "SELF" | "FATHER" | "MOTHER" | "SPOUSE" | "CHILD" | "SIBLING" | "OTHER";
+export type BiologicalSex = "MALE" | "FEMALE" | "UNSPECIFIED";
+export type MedicalRecordType = "LAB_REPORT" | "TRIAGE_SESSION" | "PHYSICAL_EXAM" | "DISCHARGE_SUMMARY";
+
+export interface PatientProfileItem {
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  relationship: PatientRelationship;
+  date_of_birth?: string | null;
+  biological_sex: BiologicalSex;
+  blood_group: string;
+  allergies: string[];
+  chronic_conditions: string[];
+  emergency_contact_phone?: string | null;
+  notes?: string | null;
+  total_records: number;
+  latest_record_date?: string | null;
+  created_at?: string | null;
+}
+
+export interface PatientMedicalRecordItem {
+  id: string;
+  profile_id: string;
+  record_type: MedicalRecordType;
+  record_date: string;
+  title: string;
+  overall_status: string;
+  qualitative_verdict: string;
+  extracted_biomarkers: any[];
+  correlated_icd11: any[];
+  notes?: string | null;
+  source_filename?: string | null;
+  created_at?: string | null;
+}
+
+export interface BiomarkerDataPoint {
+  record_id: string;
+  record_title: string;
+  date: string;
+  value: number;
+  unit: string;
+  status: string;
+  status_si: string;
+  is_abnormal: boolean;
+  is_critical: boolean;
+  display_name_en: string;
+  display_name_si: string;
+  ref_interval: string;
+}
+
+export interface BiomarkerTrendItem {
+  canonical_id: string;
+  display_name_en: string;
+  display_name_si: string;
+  category: string;
+  unit: string;
+  ref_interval: string;
+  data_points: BiomarkerDataPoint[];
+  point_count: number;
+  baseline_value: number;
+  previous_value: number;
+  latest_value: number;
+  delta_value: number;
+  delta_percentage: number;
+  trajectory: "IMPROVING" | "DETERIORATING" | "STABLE" | "CRITICAL_ATTENTION";
+  trajectory_label_en: string;
+  trajectory_label_si: string;
+  clinical_insight_en: string;
+  clinical_insight_si: string;
+  is_abnormal: boolean;
+  is_critical: boolean;
+}
+
+export interface PatientTrendsResponse {
+  profile_id: string;
+  patient_name: string;
+  total_records_analyzed: number;
+  tracked_biomarkers_count: number;
+  trends: BiomarkerTrendItem[];
+  overall_trajectory: "IMPROVING" | "DETERIORATING" | "STABLE" | "CRITICAL_ATTENTION";
+  longitudinal_summary_en: string;
+  longitudinal_summary_si: string;
+}
+
+
 

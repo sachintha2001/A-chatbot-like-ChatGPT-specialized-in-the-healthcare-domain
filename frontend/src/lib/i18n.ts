@@ -5,6 +5,9 @@ export interface Translations {
   appTitle: string;
   appSubtitle: string;
   navTriage: string;
+  navReports: string;
+  navRecords: string;
+  navOntology: string;
   navRLHF: string;
   navAnalytics: string;
   navEvaluation: string;
@@ -94,6 +97,9 @@ export const translations: Record<Language, Translations> = {
     appTitle: "MedGuard AI",
     appSubtitle: "Clinical Decision Support & Patient Triage",
     navTriage: "Clinical Triage",
+    navReports: "Lab Reports",
+    navRecords: "Health Records (EHR)",
+    navOntology: "ICD-11 Ontology",
     navRLHF: "Clinician RLHF Queue",
     navAnalytics: "Epidemiological Analytics",
     navEvaluation: "Evaluation & Benchmarks",
@@ -183,6 +189,9 @@ export const translations: Record<Language, Translations> = {
     appTitle: "MedGuard AI",
     appSubtitle: "සායනික තීරණ සහායක සහ රෝගී Triage පද්ධතිය",
     navTriage: "සායනික Triage",
+    navReports: "වෛද්‍ය වාර්තා",
+    navRecords: "සෞඛ්‍ය ඉතිහාසය (EHR)",
+    navOntology: "ICD-11 නාමාවලිය",
     navRLHF: "වෛද්‍ය RLHF සමාලෝචනය",
     navAnalytics: "වසංගතවේදී විශ්ලේෂණ",
     navEvaluation: "ඇගයීම් සහ මිණුම්දඬු",

@@ -24,14 +24,21 @@ import {
   SwitchCamera,
   Scan,
   Image as ImageIcon,
-  Check
+  Check,
+  BookmarkPlus,
+  User,
+  ExternalLink,
+  X
 } from "lucide-react";
-import { ReportAnalysisResult, SampleReportItem } from "@/lib/types";
+import Link from "next/link";
+import { ReportAnalysisResult, SampleReportItem, PatientProfileItem } from "@/lib/types";
 import {
   uploadMedicalReportFile,
   analyzeReportText,
   fetchSampleReports,
-  captureMedicalReportImage
+  captureMedicalReportImage,
+  fetchPatientProfiles,
+  createPatientRecord
 } from "@/lib/api";
 import { useLanguage } from "@/lib/LanguageContext";
 
@@ -46,6 +53,13 @@ export function MedicalReportAnalyzer() {
   const [samples, setSamples] = useState<SampleReportItem[]>([]);
   const [expandedBiomarker, setExpandedBiomarker] = useState<string | null>(null);
   const [showExtractedOcr, setShowExtractedOcr] = useState(false);
+
+  // Save to EHR profile state
+  const [profiles, setProfiles] = useState<PatientProfileItem[]>([]);
+  const [selectedProfileToSave, setSelectedProfileToSave] = useState<string>("");
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [savingRecord, setSavingRecord] = useState(false);
 
   // Camera states
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -272,6 +286,56 @@ export function MedicalReportAnalyzer() {
     setCapturedImage(null);
     setErrorMessage(null);
     setShowExtractedOcr(false);
+  };
+
+  const openSaveModal = async () => {
+    try {
+      const list = await fetchPatientProfiles();
+      setProfiles(list || []);
+      if (list && list.length > 0 && !selectedProfileToSave) {
+        setSelectedProfileToSave(list[0].id);
+      }
+      setShowSaveModal(true);
+      setSaveSuccess(null);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to load patient profiles.");
+    }
+  };
+
+  const handleSaveToProfile = async () => {
+    if (!selectedProfileToSave || !analysisResult) return;
+    setSavingRecord(true);
+    setErrorMessage(null);
+    try {
+      const summaryText = isSi
+        ? (analysisResult.clinical_directives_si?.join(" ") || analysisResult.overall_status_si)
+        : (analysisResult.clinical_directives_en?.join(" ") || analysisResult.overall_status_en);
+
+      await createPatientRecord(selectedProfileToSave, {
+        record_type: "LAB_REPORT",
+        title: isSi
+          ? `රසායනාගාර වාර්තාව (${analysisResult.overall_status_si || analysisResult.overall_status_en})`
+          : `Lab Report (${analysisResult.overall_status_en})`,
+        overall_status: analysisResult.overall_status,
+        qualitative_verdict: analysisResult.qualitative_verdict,
+        extracted_biomarkers: analysisResult.parameters || [],
+        correlated_icd11: (analysisResult.correlated_conditions || []).map((c) => ({
+          icd11: c.icd11,
+          condition: c.condition,
+          condition_si: c.condition_si,
+          urgency: c.urgency
+        })),
+        notes: summaryText,
+        source_filename: analysisResult.filename || "Uploaded Report",
+        record_date: new Date().toISOString()
+      });
+
+      setSaveSuccess(selectedProfileToSave);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to save record to patient profile.");
+    } finally {
+      setSavingRecord(false);
+    }
   };
 
   const isSi = language === "si";
@@ -688,15 +752,25 @@ export function MedicalReportAnalyzer() {
                       </div>
                     </div>
 
-                    {isEmergency && (
-                      <a
-                        href="tel:1990"
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg transition-colors shrink-0"
+                    <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                      {isEmergency && (
+                        <a
+                          href="tel:1990"
+                          className="inline-flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg transition-colors shrink-0"
+                        >
+                          <PhoneCall className="w-4 h-4" />
+                          <span>{isSi ? "1990 සුවසැරිය / 911 අමතන්න" : "Emergency Direct Dial"}</span>
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={openSaveModal}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold shadow-lg transition-colors border border-teal-400/30 shrink-0"
                       >
-                        <PhoneCall className="w-4 h-4" />
-                        <span>{isSi ? "1990 සුවසැරිය / 911 අමතන්න" : "Emergency Direct Dial"}</span>
-                      </a>
-                    )}
+                        <BookmarkPlus className="w-4 h-4" />
+                        <span>{isSi ? "රෝගී ඉතිහාසයට එක්කරන්න (EHR)" : "Save to Patient EHR"}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -942,6 +1016,148 @@ export function MedicalReportAnalyzer() {
           })()
         )}
       </div>
+
+      {/* Save to Patient Profile (EHR) Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative">
+            <button
+              onClick={() => {
+                setShowSaveModal(false);
+                setSaveSuccess(null);
+              }}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                <BookmarkPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-100">
+                  {isSi ? "රෝගී ඉතිහාසයට ඇතුළත් කරන්න (EHR)" : "Save to Patient Health Record (EHR)"}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {isSi
+                    ? "මෙම රසායනාගාර වාර්තාවේ අගයන් පවුලේ සාමාජිකයෙකුගේ පැතිකඩට එක්කර ප්‍රවණතා විශ්ලේෂණය කරන්න"
+                    : "Attach this lab report to a patient profile to track longitudinal biomarker trajectories"}
+                </p>
+              </div>
+            </div>
+
+            {saveSuccess ? (
+              <div className="space-y-4 py-2">
+                <div className="p-4 rounded-xl bg-teal-950/60 border border-teal-600/50 flex items-center gap-3 text-teal-300 text-xs">
+                  <Check className="w-5 h-5 text-teal-400 shrink-0" />
+                  <div>
+                    <div className="font-bold">
+                      {isSi ? "වාර්තාව සාර්ථකව රෝගී පැතිකඩට එක්කරන ලදී!" : "Report successfully saved to patient profile!"}
+                    </div>
+                    <div className="text-[11px] text-teal-400/80 mt-0.5">
+                      {isSi
+                        ? "ජෛව සලකුණු ප්‍රවණතා සහ කාලානුක්‍රමික සටහන් යාවත්කාලීන විය."
+                        : "Biomarker trends and longitudinal trajectory charts have been updated."}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowSaveModal(false);
+                      setSaveSuccess(null);
+                    }}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                  >
+                    {isSi ? "වසන්න" : "Close"}
+                  </button>
+                  <Link
+                    href={`/records?profile=${saveSuccess}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-colors"
+                  >
+                    <span>{isSi ? "රෝගී ඉතිහාසය සහ ප්‍රස්ථාර බලන්න" : "View Patient EHR & Trends"}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-2">
+                    {isSi ? "රෝගී පැතිකඩ තෝරන්න (Select Profile)" : "Select Patient Profile"}
+                  </label>
+                  {profiles.length === 0 ? (
+                    <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-400">
+                      {isSi ? "රෝගී පැතිකඩ හමු නොවීය. කරුණාකර පළමුව පැතිකඩක් සාදන්න." : "No patient profiles found. Please create one in Records."}
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedProfileToSave}
+                      onChange={(e) => setSelectedProfileToSave(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
+                    >
+                      {profiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.full_name} ({p.relationship}) - {p.biological_sex}, {p.blood_group || "Unknown Blood Group"}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Report Summary Card in Modal */}
+                <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 space-y-1.5 text-xs text-slate-300">
+                  <div className="font-semibold text-slate-200">
+                    {isSi ? "වාර්තා සාරාංශය (To be saved):" : "Record Summary to be saved:"}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{isSi ? "හඳුනාගත් ජෛව සලකුණු:" : "Biomarkers parsed:"}</span>
+                    <span className="font-mono text-teal-400 font-bold">{analysisResult?.parameters?.length || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{isSi ? "තත්ත්වය:" : "Diagnostic classification:"}</span>
+                    <span className="font-bold text-slate-200">{analysisResult?.overall_status_en}</span>
+                  </div>
+                  {(analysisResult?.abnormal_count || 0) > 0 && (
+                    <div className="flex items-center justify-between text-[11px] text-rose-400">
+                      <span>{isSi ? "අසාමාන්‍ය අගයන්:" : "Abnormal flags:"}</span>
+                      <span className="font-mono font-bold">{analysisResult?.abnormal_count}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveModal(false)}
+                    disabled={savingRecord}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+                  >
+                    {isSi ? "අවලංගු කරන්න" : "Cancel"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveToProfile}
+                    disabled={savingRecord || profiles.length === 0}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl text-xs font-bold transition-colors shadow-lg"
+                  >
+                    {savingRecord ? (
+                      <span>{isSi ? "සුරකිමින් පවතී..." : "Saving..."}</span>
+                    ) : (
+                      <>
+                        <BookmarkPlus className="w-3.5 h-3.5" />
+                        <span>{isSi ? "සුරකින්න (Confirm & Save)" : "Confirm & Save"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

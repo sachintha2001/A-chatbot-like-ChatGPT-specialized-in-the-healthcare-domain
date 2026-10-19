@@ -26,6 +26,13 @@ from app.models.pathology import (
     MedicalSpecialty,
     TriageAcuityLevel,
 )
+from app.models.patient import (
+    PatientProfile,
+    PatientMedicalRecord,
+    RelationshipType,
+    BiologicalSex,
+    MedicalRecordType,
+)
 
 __all__ = [
     "Base",
@@ -47,4 +54,9 @@ __all__ = [
     "Pathology",
     "MedicalSpecialty",
     "TriageAcuityLevel",
+    "PatientProfile",
+    "PatientMedicalRecord",
+    "RelationshipType",
+    "BiologicalSex",
+    "MedicalRecordType",
 ]

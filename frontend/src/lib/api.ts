@@ -9,7 +9,10 @@ import {
   MonitoringStatus,
   StreamBadgeData,
   StreamCitation,
-  StreamStatusData
+  StreamStatusData,
+  PatientProfileItem,
+  PatientMedicalRecordItem,
+  PatientTrendsResponse
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
@@ -430,5 +433,116 @@ export async function fetchSampleReports(): Promise<{ samples: any[] }> {
   if (!res.ok) throw new Error("Failed to fetch sample clinical reports");
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Patient Profiles & Longitudinal EHR Records API
+// ---------------------------------------------------------------------------
+
+export async function fetchPatientProfiles(): Promise<PatientProfileItem[]> {
+  const res = await fetch(`${API_BASE}/patient/profiles`);
+  if (!res.ok) throw new Error("Failed to fetch patient profiles");
+  return res.json();
+}
+
+export async function createPatientProfile(payload: {
+  first_name: string;
+  last_name: string;
+  relationship: string;
+  date_of_birth?: string;
+  biological_sex?: string;
+  blood_group?: string;
+  allergies?: string[];
+  chronic_conditions?: string[];
+  emergency_contact_phone?: string;
+  notes?: string;
+}): Promise<{ status: string; profile_id: string; message_en: string; message_si: string }> {
+  const res = await fetch(`${API_BASE}/patient/profiles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Failed to create profile" }));
+    throw new Error(errorData.detail || "Failed to create patient profile");
+  }
+  return res.json();
+}
+
+export async function fetchPatientProfile(profileId: string): Promise<PatientProfileItem> {
+  const res = await fetch(`${API_BASE}/patient/profiles/${profileId}`);
+  if (!res.ok) throw new Error(`Failed to fetch profile ${profileId}`);
+  return res.json();
+}
+
+export async function updatePatientProfile(
+  profileId: string,
+  payload: Partial<PatientProfileItem>
+): Promise<{ status: string; profile_id: string }> {
+  const res = await fetch(`${API_BASE}/patient/profiles/${profileId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error("Failed to update patient profile");
+  return res.json();
+}
+
+export async function deletePatientProfile(profileId: string): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/patient/profiles/${profileId}`, {
+    method: "DELETE"
+  });
+  if (!res.ok) throw new Error("Failed to delete patient profile");
+  return res.json();
+}
+
+export async function fetchPatientRecords(
+  profileId: string,
+  recordType?: string
+): Promise<{
+  profile_id: string;
+  patient_name: string;
+  total_records: number;
+  records: PatientMedicalRecordItem[];
+}> {
+  const query = recordType ? `?record_type=${encodeURIComponent(recordType)}` : "";
+  const res = await fetch(`${API_BASE}/patient/profiles/${profileId}/records${query}`);
+  if (!res.ok) throw new Error(`Failed to fetch records for patient ${profileId}`);
+  return res.json();
+}
+
+export async function createPatientRecord(
+  profileId: string,
+  payload: {
+    record_type: string;
+    title: string;
+    record_date?: string;
+    overall_status?: string;
+    qualitative_verdict?: string;
+    extracted_biomarkers?: any[];
+    correlated_icd11?: any[];
+    notes?: string;
+    raw_text?: string;
+    source_filename?: string;
+    session_id?: string;
+  }
+): Promise<{ status: string; record_id: string; message_en: string; message_si: string }> {
+  const res = await fetch(`${API_BASE}/patient/profiles/${profileId}/records`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Failed to append record" }));
+    throw new Error(errorData.detail || "Failed to append medical record");
+  }
+  return res.json();
+}
+
+export async function fetchPatientTrends(profileId: string): Promise<PatientTrendsResponse> {
+  const res = await fetch(`${API_BASE}/patient/profiles/${profileId}/trends`);
+  if (!res.ok) throw new Error(`Failed to fetch biomarker trends for patient ${profileId}`);
+  return res.json();
+}
+
 
 
