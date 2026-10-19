@@ -5,6 +5,7 @@ import uuid
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, List, Optional, Tuple
+from app.config import settings
 from app.knowledge.lab_biomarkers import CLINICAL_BIOMARKER_REGISTRY
 
 
@@ -284,9 +285,63 @@ class MedicalReportAnalyzer:
                 if len(alt_text.strip()) > len(text.strip()):
                     text = alt_text
 
+            if text and len(text.strip()) >= 15:
+                return text
+
+            # Cloud Gemini Vision OCR fallback if Tesseract extracted sparse text
+            if settings.GEMINI_API_KEY:
+                vision_res = self._extract_text_via_gemini_vision(file_bytes)
+                if vision_res and len(vision_res.strip()) >= 15:
+                    return vision_res
+
             return text or ""
         except Exception as e:
+            # Fallback to Cloud Gemini Vision OCR if Tesseract binary is not installed on host
+            if settings.GEMINI_API_KEY:
+                vision_res = self._extract_text_via_gemini_vision(file_bytes)
+                if vision_res and len(vision_res.strip()) >= 15:
+                    return vision_res
             return f"OCR Extraction Error: {str(e)}"
+
+    def _extract_text_via_gemini_vision(self, image_bytes: bytes) -> Optional[str]:
+        """Transcribes medical laboratory documents using Gemini Multimodal Vision API."""
+        try:
+            import base64
+            import httpx
+            b64_img = base64.b64encode(image_bytes).decode("utf-8")
+            model = settings.GEMINI_MODEL or "gemini-1.5-flash"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {
+                            "text": (
+                                "You are a clinical laboratory document OCR reader. "
+                                "Transcribe every single line of text from this laboratory test report image verbatim. "
+                                "Extract all test names (e.g. Platelets, Hemoglobin, WBC, Fasting Blood Sugar, HbA1c, Cholesterol, Dengue NS1), "
+                                "numerical values, units, and reference ranges line by line."
+                            )
+                        },
+                        {
+                            "inlineData": {
+                                "mimeType": "image/jpeg",
+                                "data": b64_img
+                            }
+                        }
+                    ]
+                }]
+            }
+            with httpx.Client(timeout=15.0) as client:
+                resp = client.post(url, params={"key": settings.GEMINI_API_KEY}, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        return "".join(p.get("text", "") for p in parts)
+        except Exception:
+            pass
+        return None
 
     def parse_report_text(self, raw_text: str) -> List[Dict[str, Any]]:
         """

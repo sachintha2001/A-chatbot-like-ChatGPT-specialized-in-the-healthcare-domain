@@ -30,7 +30,9 @@ import { EmergencyBanner } from "@/components/EmergencyBanner";
 import { CitationDrawer } from "@/components/CitationDrawer";
 import { StreamingChatView } from "@/components/chat/StreamingChatView";
 import { OntologyBrowserModal } from "@/components/chat/OntologyBrowserModal";
+import { CoverLandingPage } from "@/components/CoverLandingPage";
 import { useLanguage } from "@/lib/LanguageContext";
+import { useUI } from "@/lib/UIContext";
 import {
   clinicalVoicePlayer,
   ClinicalSpeechRecognizer,
@@ -39,6 +41,7 @@ import {
 
 export default function ClinicalTriagePage() {
   const { language, t } = useLanguage();
+  const { isCoverPage: showCoverPage, setIsCoverPage: setShowCoverPage } = useUI();
   const [activeMode, setActiveMode] = useState<"STREAMING" | "LEGACY">("STREAMING");
   const [isOntologyOpen, setIsOntologyOpen] = useState(false);
 
@@ -241,12 +244,32 @@ export default function ClinicalTriagePage() {
     }
   };
 
+  const handleEnterClinicalSystem = () => {
+    setShowCoverPage(false);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  if (showCoverPage) {
+    return <CoverLandingPage onEnterSystem={handleEnterClinicalSystem} />;
+  }
+
   return (
-    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-h-[920px] space-y-2.5">
+    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-h-[920px] space-y-2.5 animate-in fade-in slide-in-from-bottom-3 duration-500">
       {/* Top Clinical Mode Selector & Quick Diagnostic Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-[#CBE2EA] rounded-2xl px-4 py-2.5 shrink-0 text-xs shadow-clinical-card">
         <div className="flex items-center gap-2">
-          <span className="text-[#486581] font-semibold flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowCoverPage(true)}
+            className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 bg-[#F0F9FF] hover:bg-teal-50 text-[#0A2540] border border-[#CBE2EA] transition-all cursor-pointer"
+            title="Return to Cover & Benefits Page"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+            <span>{language === "si" ? "මුල් පිටුව (Cover Page)" : "Cover Page"}</span>
+          </button>
+          <span className="text-[#486581] font-semibold hidden sm:flex items-center gap-1.5 ml-1">
             <HeartPulse className="w-4 h-4 text-teal-600" />
             <span>Clinical Triage Engine:</span>
           </span>
