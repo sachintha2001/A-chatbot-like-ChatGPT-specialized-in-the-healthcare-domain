@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
+from fastapi.responses import Response
 
 from app.engine.report_analyzer import report_analyzer
 from app.knowledge.lab_biomarkers import CLINICAL_BIOMARKER_REGISTRY
@@ -13,6 +14,12 @@ class ReportTextAnalysisRequest(BaseModel):
     patient_age_group: Optional[str] = "ADULT"
     biological_sex: Optional[str] = "UNSPECIFIED"
     language: Optional[str] = "en"
+
+
+class ExportSummaryPdfRequest(BaseModel):
+    analysis_result: Dict[str, Any]
+    patient_name: Optional[str] = "Patient / Walk-in"
+    patient_age_sex: Optional[str] = "Adult / Unspecified"
 
 
 SAMPLE_CLINICAL_REPORTS = [
@@ -91,6 +98,40 @@ SAMPLE_CLINICAL_REPORTS = [
             "ALT (SGPT): 24 U/L\n"
             "Clinical Impression: All parameters within standard reference limits."
         )
+    },
+    {
+        "id": "multipage_executive_checkup_6p",
+        "title_en": "Multi-Page Hospital Health Checkup Booklet (6 Pages Batch)",
+        "title_si": "බහු-පිටු රෝහල් සම්පූර්ණ වෛද්‍ය වාර්තා පොත (පිටු 6ක Batch OCR)",
+        "sample_text": (
+            "=== PAGE 1 OF 6: HEMATOLOGY & FULL BLOOD COUNT (FBC) ===\n"
+            "Hemoglobin (Hb): 13.8 g/dL\n"
+            "Total WBC: 7400 /uL\n"
+            "Platelet Count: 88000 /uL\n"
+            "Dengue NS1 Antigen: NEGATIVE\n\n"
+            "=== PAGE 2 OF 6: FASTING LIPID & CARDIOVASCULAR PROFILE ===\n"
+            "Total Cholesterol: 262 mg/dL\n"
+            "Triglycerides: 235 mg/dL\n"
+            "HDL Cholesterol: 38 mg/dL\n"
+            "LDL Cholesterol: 174 mg/dL\n\n"
+            "=== PAGE 3 OF 6: DIABETES & GLYCEMIC CONTROL PANEL ===\n"
+            "Fasting Blood Sugar (FBS): 168 mg/dL\n"
+            "Glycated Hemoglobin (HbA1c): 8.2 %\n\n"
+            "=== PAGE 4 OF 6: RENAL FUNCTION & ELECTROLYTES PANEL ===\n"
+            "Serum Creatinine: 1.6 mg/dL\n"
+            "eGFR: 52 mL/min/1.73m2\n"
+            "Serum Potassium: 4.6 mmol/L\n"
+            "Serum Sodium: 139 mmol/L\n\n"
+            "=== PAGE 5 OF 6: LIVER FUNCTION PANEL (LFT) ===\n"
+            "ALT (SGPT): 68 U/L\n"
+            "AST (SGOT): 54 U/L\n"
+            "Total Bilirubin: 1.1 mg/dL\n\n"
+            "=== PAGE 6 OF 6: THYROID, INFLAMMATION & URINALYSIS ===\n"
+            "TSH: 3.1 mIU/L\n"
+            "CRP: 14.2 mg/L\n"
+            "Urine Protein: POSITIVE\n"
+            "Urine Pus Cells: 6 /HPF"
+        )
     }
 ]
 
@@ -103,6 +144,9 @@ class CameraImageCaptureRequest(BaseModel):
     language: Optional[str] = "en"
 
 
+ALLOWED_REPORT_EXTENSIONS = (".pdf", ".txt", ".csv", ".text", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff")
+
+
 @router.post("/upload")
 async def upload_medical_report(
     file: UploadFile = File(...),
@@ -111,14 +155,13 @@ async def upload_medical_report(
     language: str = Form("en")
 ):
     """
-    Accepts laboratory report files (PDF, TXT, CSV, or photographed images PNG/JPG/WEBP),
-    extracts raw text (with OCR for images), identifies clinical biomarkers,
-    and returns a structured clinical interpretation.
+    Accepts single or multi-page laboratory report files (5-10+ page PDF booklets, TXT, CSV, or photographed images),
+    executes parallel asynchronous batch OCR across all pages, identifies clinical biomarkers,
+    and returns a consolidated clinical interpretation with page-by-page breakdown.
     """
-    allowed_extensions = (".pdf", ".txt", ".csv", ".text", ".png", ".jpg", ".jpeg", ".webp", ".bmp")
     filename = file.filename or "report.txt"
 
-    if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
+    if not any(filename.lower().endswith(ext) for ext in ALLOWED_REPORT_EXTENSIONS):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported file format. Please upload a PDF (.pdf), document (.txt, .csv), or report photo (.png, .jpg, .jpeg, .webp)."
@@ -126,16 +169,14 @@ async def upload_medical_report(
 
     try:
         content = await file.read()
-        extracted_text = report_analyzer.extract_text_from_file(content, filename)
-        
-        if not extracted_text or len(extracted_text.strip()) < 5:
+        if not content or len(content) < 5:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Unable to extract text content from the uploaded document or image. Ensure the image has good lighting and readable text."
+                detail="Uploaded file is empty."
             )
 
-        analysis = report_analyzer.analyze_report(
-            raw_text=extracted_text,
+        analysis = await report_analyzer.analyze_multipage_batch_async(
+            files_payload=[(content, filename)],
             patient_age_group=patient_age_group,
             biological_sex=biological_sex,
             language=language
@@ -147,8 +188,6 @@ async def upload_medical_report(
                 detail=err_msg or "Unable to extract recognized laboratory biomarker values from the document."
             )
 
-        analysis["filename"] = filename
-        analysis["extracted_text_preview"] = extracted_text[:500] + ("..." if len(extracted_text) > 500 else "")
         return analysis
     except HTTPException:
         raise
@@ -157,6 +196,85 @@ async def upload_medical_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while processing the clinical report: {str(e)}"
         )
+
+
+@router.post("/upload-batch")
+async def upload_medical_reports_batch(
+    files: List[UploadFile] = File(...),
+    patient_age_group: str = Form("ADULT"),
+    biological_sex: str = Form("UNSPECIFIED"),
+    language: str = Form("en")
+):
+    """
+    Asynchronous Batch Multi-Page & Multi-File OCR Endpoint.
+    Accepts a multi-page PDF booklet OR 1 to 15 separate scanned report pages (PDF/PNG/JPG),
+    scans all pages concurrently in background worker threads, and consolidates all biomarkers
+    into a single unified dashboard with `page_breakdown`.
+    """
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please provide at least one report file or page image."
+        )
+
+    files_payload: List[ tuple[bytes, str] ] = []
+    for f in files[:15]:
+        fname = f.filename or "page.png"
+        if not any(fname.lower().endswith(ext) for ext in ALLOWED_REPORT_EXTENSIONS):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported file format for '{fname}'."
+            )
+        f_bytes = await f.read()
+        if f_bytes:
+            files_payload.append((f_bytes, fname))
+
+    if not files_payload:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Uploaded files are empty."
+        )
+
+    analysis = await report_analyzer.analyze_multipage_batch_async(
+        files_payload=files_payload,
+        patient_age_group=patient_age_group,
+        biological_sex=biological_sex,
+        language=language
+    )
+    if not analysis.get("success"):
+        err_msg = analysis.get("message_si") if language == "si" else analysis.get("message_en")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=err_msg or "Unable to extract recognized laboratory biomarker values across the uploaded batch."
+        )
+    return analysis
+
+
+@router.post("/analyze-sample-multipage-pdf")
+async def analyze_sample_multipage_pdf_booklet(language: str = "en"):
+    """
+    Generates a real 6-page PDF Hospital Comprehensive Health Checkup Booklet in memory
+    and runs it through the live Multi-Page PDF Asynchronous Batch OCR & Biomarker Engine.
+    """
+    pdf_bytes = report_analyzer.generate_sample_multipage_pdf_bytes()
+    return await report_analyzer.analyze_multipage_batch_async(
+        files_payload=[(pdf_bytes, "Asiri_Executive_Health_Checkup_6Pages.pdf")],
+        patient_age_group="ADULT",
+        biological_sex="UNSPECIFIED",
+        language=language
+    )
+
+
+@router.get("/batch-status/{job_id}")
+async def get_batch_ocr_job_status(job_id: str):
+    """Returns real-time status and telemetry for an asynchronous multi-page batch OCR job."""
+    job = report_analyzer.batch_jobs.get(job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Batch OCR job '{job_id}' not found."
+        )
+    return job
 
 
 @router.post("/capture-image")
@@ -248,3 +366,34 @@ async def get_sample_reports():
     return {
         "samples": SAMPLE_CLINICAL_REPORTS
     }
+
+
+@router.post("/export-summary-pdf")
+async def export_clinical_summary_pdf(payload: ExportSummaryPdfRequest):
+    """
+    Generates an official, downloadable PDF 1.4 Medical Assessment & Physician Handover Report
+    including all tested biomarkers, High/Low flags, correlated WHO ICD-11 codes, clinical directives,
+    and an official cryptographic verification seal stamp.
+    """
+    if not payload.analysis_result or not isinstance(payload.analysis_result, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Valid analysis_result object is required to generate the Medical Assessment PDF."
+        )
+
+    pdf_bytes, filename, ref_id = report_analyzer.generate_clinical_assessment_pdf(
+        analysis_result=payload.analysis_result,
+        patient_name=payload.patient_name or "Patient / Walk-in",
+        patient_age_sex=payload.patient_age_sex or "Adult / Unspecified",
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Report-Ref-Id": ref_id,
+            "Access-Control-Expose-Headers": "Content-Disposition, X-Report-Ref-Id",
+        },
+    )
+

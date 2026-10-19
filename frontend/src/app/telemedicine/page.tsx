@@ -104,24 +104,24 @@ export default function TelemedicineBookingPage() {
   return (
     <div className="space-y-6">
       {/* Top Hero Banner */}
-      <div className="p-6 rounded-2xl bg-slate-950 text-slate-100 border border-slate-800 shadow-xl">
+      <div className="clinical-dark-preserve p-6 rounded-2xl bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] text-slate-100 border border-teal-500/30 shadow-clinical-elevated">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/40 flex items-center justify-center text-teal-400 shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300 shrink-0 shadow-inner">
               <CalendarCheck className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-bold text-white">
                   {isSi
                     ? "සැබෑ විශේෂඥ වෛද්‍යවරුන් හමුවීමේ සහ Telemedicine සේවාව"
                     : "Sri Lankan Specialist Channelling & Telemedicine Hub"}
                 </h1>
-                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-700 font-bold">
+                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-200 border border-teal-300/40 font-bold">
                   eChannelling • Doc990 • oDoc
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1 max-w-3xl leading-relaxed">
+              <p className="text-xs text-cyan-100/85 mt-1 max-w-3xl leading-relaxed">
                 {isSi
                   ? "ඔබගේ Triage රෝග ලක්ෂණ හෝ රසායනාගාර වාර්තාවට ගැළපෙන විශේෂඥ වෛද්‍යවරයෙකු (Cardiologist, Hematologist, Endocrinologist, ආදී) eChannelling, Doc990, හෝ oDoc හරහා ස්වයංක්‍රීය SBAR සායනික වාර්තාවක් සමඟ ක්ෂණිකව වෙන්කරවා ගන්න."
                   : "Instantly channel SLMC-registered Specialist Consultants across Asiri, Nawaloka, Lanka Hospitals, Durdans, eChannelling, Doc990, and oDoc 24/7 Video Telemedicine with automated SBAR clinical handover."}
@@ -134,8 +134,8 @@ export default function TelemedicineBookingPage() {
               onClick={() => setActiveTab("DIRECTORY")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === "DIRECTORY"
-                  ? "bg-teal-600 text-white shadow-md"
-                  : "bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800"
+                  ? "bg-teal-500 text-white shadow-md"
+                  : "bg-white/10 text-cyan-100 border border-white/20 hover:bg-white/20"
               }`}
             >
               {isSi ? "විශේෂඥ වෛද්‍ය නාමාවලිය" : "Specialist Directory"} ({specialists.length})
@@ -144,17 +144,18 @@ export default function TelemedicineBookingPage() {
               onClick={() => setActiveTab("BOOKINGS")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "BOOKINGS"
-                  ? "bg-teal-600 text-white shadow-md"
-                  : "bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800"
+                  ? "bg-teal-500 text-white shadow-md"
+                  : "bg-white/10 text-cyan-100 border border-white/20 hover:bg-white/20"
               }`}
             >
               <span>{isSi ? "මගේ වෙන්කිරීම් (My Bookings)" : "My Appointments"}</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-slate-950 text-teal-300 font-mono text-[10px]">
+              <span className="px-1.5 py-0.2 rounded-full bg-black/30 text-teal-200 font-mono text-[10px]">
                 {bookings.length}
               </span>
             </button>
           </div>
         </div>
+
 
         {/* Partner Gateways Strip */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-5 pt-5 border-t border-slate-800/80">
@@ -261,7 +262,7 @@ export default function TelemedicineBookingPage() {
                         <span className="inline-block text-[10px] font-mono px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800 font-semibold mb-1.5">
                           {doc.slmc_reg_no} • ★ {doc.rating}
                         </span>
-                        <h3 className="text-sm font-bold text-white">
+                        <h3 className="text-sm font-bold text-slate-100">
                           {isSi ? doc.full_name_si : doc.full_name_en}
                         </h3>
                         <div className="text-xs font-semibold text-teal-400 mt-0.5">
@@ -315,7 +316,7 @@ export default function TelemedicineBookingPage() {
                     <button
                       type="button"
                       onClick={() => handleOpenBookingForDoctor(doc)}
-                      className="flex-1 py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-700 hover:from-teal-500 hover:to-cyan-600 text-white text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <CalendarCheck className="w-4 h-4" />
                       <span>
@@ -389,12 +390,13 @@ export default function TelemedicineBookingPage() {
                           {b.status}
                         </span>
                       </div>
-                      <h3 className="text-sm font-bold text-white mt-1.5">
+                      <h3 className="text-sm font-bold text-slate-100 mt-1.5">
                         {isSi ? b.doctor.full_name_si : b.doctor.full_name_en} —{" "}
                         <span className="text-teal-400">
                           {isSi ? b.doctor.specialty_si : b.doctor.specialty_en}
                         </span>
                       </h3>
+
                       <div className="text-xs text-slate-400 mt-0.5">
                         {b.hospital_or_platform} • {b.scheduled_slot} • Gateway: {b.booking_gateway}
                       </div>

@@ -45,23 +45,26 @@ export default function FHIRExportPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-wrap items-center justify-between shadow-xs">
-        <div>
-          <div className="flex items-center space-x-2">
-            <Database className="w-5 h-5 text-clinical-teal" />
-            <h1 className="text-base font-bold text-clinical-navy">
+      <div className="clinical-dark-preserve bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] border border-teal-500/30 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-clinical-elevated text-white">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300 shrink-0">
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold text-white">
               EHR Interoperability & HL7 FHIR R4 Bundle Exporter
             </h1>
+            <p className="text-xs text-cyan-100/80 mt-0.5 max-w-3xl">
+              Standardized Fast Healthcare Interoperability Resources (FHIR R4) Document Bundle export supporting
+              direct ingestion into hospital Electronic Health Record (EHR) systems (Epic Systems, Cerner, NHS Spine).
+            </p>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Standardized Fast Healthcare Interoperability Resources (FHIR R4) Document Bundle export supporting
-            direct ingestion into hospital Electronic Health Record (EHR) systems (Epic Systems, Cerner, NHS Spine).
-          </p>
         </div>
-        <span className="text-xs font-mono bg-slate-100 text-slate-700 px-2.5 py-1 rounded border border-slate-200">
+        <span className="text-xs font-mono bg-white/10 text-teal-200 px-3 py-1.5 rounded-xl border border-teal-300/30">
           Standard: HL7 FHIR Release 4
         </span>
       </div>
+
 
       {/* Query Bar */}
       <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs">

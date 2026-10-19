@@ -116,21 +116,21 @@ export default function KnowledgeOntologyPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-h-[920px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-2xl text-slate-100">
+    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-h-[920px] bg-slate-950 border border-[#CBE2EA] rounded-2xl overflow-hidden shadow-clinical-elevated text-slate-100">
       {/* Header bar */}
-      <div className="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+      <div className="clinical-dark-preserve px-6 py-4 bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] border-b border-teal-500/30 flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300 shadow-inner">
             <Layers className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              Clinical Knowledge & Disease Ontology Pipeline
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800">
+            <h1 className="text-base font-bold text-white flex items-center gap-2">
+              <span>Clinical Knowledge & Disease Ontology Pipeline</span>
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-200 border border-teal-300/40">
                 WHO ICD-11 Certified
               </span>
             </h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-cyan-100/80">
               Relational Pathology Models, Cardinal Symptom Signatures, and Federated Medical Connectors
             </p>
           </div>
@@ -139,10 +139,10 @@ export default function KnowledgeOntologyPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab("LOCAL_ONTOLOGY")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
               activeTab === "LOCAL_ONTOLOGY"
-                ? "bg-teal-600 text-white"
-                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-teal-500 text-white shadow-sm"
+                : "bg-white/10 text-cyan-100 border border-white/20 hover:bg-white/20"
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
@@ -150,10 +150,10 @@ export default function KnowledgeOntologyPage() {
           </button>
           <button
             onClick={() => setActiveTab("FEDERATED_SEARCH")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
               activeTab === "FEDERATED_SEARCH"
-                ? "bg-teal-600 text-white"
-                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-teal-500 text-white shadow-sm"
+                : "bg-white/10 text-cyan-100 border border-white/20 hover:bg-white/20"
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
@@ -161,6 +161,7 @@ export default function KnowledgeOntologyPage() {
           </button>
         </div>
       </div>
+
 
       {/* Main Body */}
       {activeTab === "LOCAL_ONTOLOGY" ? (

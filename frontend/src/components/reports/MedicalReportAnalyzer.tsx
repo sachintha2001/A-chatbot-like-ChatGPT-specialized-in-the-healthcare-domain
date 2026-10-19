@@ -29,12 +29,22 @@ import {
   User,
   ExternalLink,
   X,
-  CalendarCheck
+  CalendarCheck,
+  BookOpen,
+  Files,
+  Download,
+  Share2,
+  Printer,
+  ShieldCheck,
+  Award
 } from "lucide-react";
 import Link from "next/link";
 import { ReportAnalysisResult, SampleReportItem, PatientProfileItem } from "@/lib/types";
 import {
   uploadMedicalReportFile,
+  uploadMedicalReportsBatch,
+  analyzeSampleMultipagePdf,
+  downloadMedicalAssessmentPdf,
   analyzeReportText,
   fetchSampleReports,
   captureMedicalReportImage,
@@ -48,6 +58,7 @@ export function MedicalReportAnalyzer() {
   const { language } = useLanguage();
   const [inputMode, setInputMode] = useState<"UPLOAD" | "CAMERA" | "TEXT">("UPLOAD");
   const [file, setFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [reportText, setReportText] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -55,6 +66,13 @@ export function MedicalReportAnalyzer() {
   const [samples, setSamples] = useState<SampleReportItem[]>([]);
   const [expandedBiomarker, setExpandedBiomarker] = useState<string | null>(null);
   const [showExtractedOcr, setShowExtractedOcr] = useState(false);
+  const [selectedPageFilter, setSelectedPageFilter] = useState<number | null>(null);
+
+  // Downloadable Medical Assessment PDF & Official Certificate states
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfPatientName, setPdfPatientName] = useState<string>("Walk-in Patient");
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [lastGeneratedRefId, setLastGeneratedRefId] = useState<string | null>(null);
 
   // Specialist Appointment Booking Modal state
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -202,23 +220,58 @@ export function MedicalReportAnalyzer() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const filesArr = Array.from(e.target.files);
+      setSelectedFiles(filesArr);
+      setFile(filesArr[0]);
       setErrorMessage(null);
     }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filesArr = Array.from(e.dataTransfer.files);
+      setSelectedFiles(filesArr);
+      setFile(filesArr[0]);
       setErrorMessage(null);
+    }
+  };
+
+  const removeSelectedFile = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedFiles((prev) => {
+      const next = prev.filter((_, idx) => idx !== index);
+      setFile(next[0] || null);
+      return next;
+    });
+  };
+
+  const handleAnalyzeSampleMultipagePdf = async () => {
+    setLoading(true);
+    setErrorMessage(null);
+    setSelectedPageFilter(null);
+    try {
+      const res = await analyzeSampleMultipagePdf({ language });
+      if (!res || res.success === false) {
+        throw new Error(
+          isSi
+            ? "බහු-පිටු PDF වාර්තා පොත විශ්ලේෂණය කිරීමට නොහැකි විය."
+            : "Failed to analyze the 6-page hospital checkup PDF booklet."
+        );
+      }
+      setAnalysisResult(res);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to process 6-page sample PDF booklet.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleAnalyze = async () => {
     setLoading(true);
     setErrorMessage(null);
+    setSelectedPageFilter(null);
     try {
       if (inputMode === "CAMERA") {
         if (!capturedImage) {
@@ -238,14 +291,18 @@ export function MedicalReportAnalyzer() {
         }
         setAnalysisResult(res);
       } else if (inputMode === "UPLOAD") {
-        if (!file) {
+        const filesToUpload = selectedFiles.length > 0 ? selectedFiles : file ? [file] : [];
+        if (filesToUpload.length === 0) {
           throw new Error(
             isSi
-              ? "කරුණාකර විශ්ලේෂණය සඳහා වෛද්‍ය වාර්තා ගොනුවක් (PDF, පින්තූරයක්, TXT) තෝරන්න."
-              : "Please select a medical report file (PDF, Image, TXT) to upload."
+              ? "කරුණාකර විශ්ලේෂණය සඳහා වෛද්‍ය වාර්තා ගොනුවක් (Multi-page PDF, පින්තූර, TXT) තෝරන්න."
+              : "Please select one or more medical report files (Multi-page PDF, Images, TXT) to upload."
           );
         }
-        const res = await uploadMedicalReportFile(file, { language });
+        const res =
+          filesToUpload.length > 1
+            ? await uploadMedicalReportsBatch(filesToUpload, { language })
+            : await uploadMedicalReportFile(filesToUpload[0], { language });
         if (!res || res.success === false) {
           throw new Error(
             isSi
@@ -288,10 +345,12 @@ export function MedicalReportAnalyzer() {
   const resetAnalysis = () => {
     setAnalysisResult(null);
     setFile(null);
+    setSelectedFiles([]);
     setReportText("");
     setCapturedImage(null);
     setErrorMessage(null);
     setShowExtractedOcr(false);
+    setSelectedPageFilter(null);
   };
 
   const openSaveModal = async () => {
@@ -344,27 +403,91 @@ export function MedicalReportAnalyzer() {
     }
   };
 
+  const handleDownloadOfficialPdf = async () => {
+    if (!analysisResult) return;
+    setDownloadingPdf(true);
+    setErrorMessage(null);
+    try {
+      const { blob, filename, refId } = await downloadMedicalAssessmentPdf(
+        analysisResult,
+        pdfPatientName.trim() || "Walk-in Patient",
+        "Adult / Unspecified"
+      );
+      setLastGeneratedRefId(refId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to generate Medical Assessment PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleShareViaWhatsApp = () => {
+    if (!analysisResult) return;
+    const refTag = lastGeneratedRefId || analysisResult.batch_job_id || "MGA-PDF-VERIFIED";
+    const statusText = isSi
+      ? analysisResult.overall_status_si || analysisResult.overall_status_en
+      : analysisResult.overall_status_en;
+    const elevated = (isSi ? analysisResult.elevated_parameters_si : analysisResult.elevated_parameters_en) || [];
+    const decreased = (isSi ? analysisResult.decreased_parameters_si : analysisResult.decreased_parameters_en) || [];
+    const icd11Lines = (analysisResult.correlated_conditions || []).map(
+      (c) => `• [ICD-11: ${c.icd11}] ${isSi ? c.condition_si : c.condition}`
+    );
+    const directives = (isSi ? analysisResult.clinical_directives_si : analysisResult.clinical_directives_en) || [];
+
+    const whatsappMessage = [
+      `🩺 *MEDGUARD CLINICAL AI — OFFICIAL MEDICAL ASSESSMENT SUMMARY*`,
+      `📋 *Ref ID:* ${refTag} | *Patient:* ${pdfPatientName.trim() || "Walk-in Patient"}`,
+      `⚖️ *Overall Status:* ${statusText}`,
+      analysisResult.qualitative_verdict !== "NOT_APPLICABLE"
+        ? `🔬 *Qualitative Verdict:* ${analysisResult.qualitative_verdict}`
+        : null,
+      ``,
+      `📈 *Elevated / High (වැඩි වී ඇති අගයන්):*`,
+      elevated.length > 0 ? elevated.map((e) => `  ▲ ${e}`).join("\n") : `  • None (සාමාන්‍යයි)`,
+      `📉 *Decreased / Low (අඩු වී ඇති අගයන්):*`,
+      decreased.length > 0 ? decreased.map((d) => `  ▼ ${d}`).join("\n") : `  • None (සාමාන්‍යයි)`,
+      icd11Lines.length > 0 ? `\n🧬 *WHO ICD-11 Clinical Correlations:*\n${icd11Lines.join("\n")}` : null,
+      directives.length > 0
+        ? `\n📌 *Clinical Directives (සායනික උපදෙස්):*\n${directives.map((d) => `• ${d}`).join("\n")}`
+        : null,
+      `\n✅ *Official MedGuard Clinical AI Seal — WHO / IFCC Standardized Handover*`
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`;
+    window.open(waUrl, "_blank", "noopener,noreferrer");
+  };
+
   const isSi = language === "si";
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-slate-100 rounded-xl border border-slate-800 shadow-2xl overflow-hidden">
-      {/* Top Header */}
-      <div className="px-6 py-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+    <div className="flex flex-col h-full bg-slate-950 text-slate-100 rounded-2xl border border-[#CBE2EA] shadow-clinical-elevated overflow-hidden">
+      {/* Top Clinical Diagnostic Header */}
+      <div className="clinical-dark-preserve px-6 py-4 bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] border-b border-teal-500/30 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300 shadow-inner">
             <Activity className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
+            <h1 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
               {isSi ? "සායනික රසායනාගාර වාර්තා විශ්ලේෂණය" : "Clinical Laboratory Report Diagnostic Engine"}
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800 font-bold">
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-200 border border-teal-300/40 font-bold">
                 WHO / IFCC Standardized
               </span>
             </h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-cyan-100/80">
               {isSi
-                ? "කැමරාවෙන් ඡායාරූපයක් ගෙන හෝ ගොනුවක් උඩුගත කර වාර්තාවේ අගයන් වැඩිද/අඩුද සහ ධනාත්මක/සෘණාත්මක බව ක්ෂණිකව පරික්ෂා කරන්න"
-                : "Automated OCR Parsing, Reference Interval Matching, and Clinical Positive/Negative Triaging"}
+                ? "කැමරාවෙන් ඡායාරූපයක් ගෙන හෝ ගොනුවක් උඩුගත කර වාර්තාවේ අගයන් වැඩිද/අඩුද සහ නිල මුද්‍රාව සහිත PDF වාර්තාව ක්ෂණිකව ලබාගන්න"
+                : "Multi-Page Batch OCR, WHO Reference Interval Matching, Official Sealed PDF Export & WhatsApp Handover"}
             </p>
           </div>
         </div>
@@ -372,7 +495,7 @@ export function MedicalReportAnalyzer() {
         {analysisResult && (
           <button
             onClick={resetAnalysis}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-1.5 bg-white/15 hover:bg-white/25 text-white border border-white/20 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>{isSi ? "නව වාර්තාවක්" : "New Report"}</span>
@@ -380,28 +503,28 @@ export function MedicalReportAnalyzer() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 clinical-ecg-grid">
         {!analysisResult ? (
           /* INPUT & UPLOAD VIEW */
           <div className="max-w-3xl mx-auto space-y-6">
             {/* Input Mode Selector */}
-            <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl max-w-lg mx-auto">
+            <div className="flex items-center gap-1.5 p-1.5 bg-slate-900 border border-slate-800 rounded-2xl max-w-xl mx-auto shadow-sm">
               <button
                 onClick={() => setInputMode("CAMERA")}
-                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   inputMode === "CAMERA"
-                    ? "bg-teal-600 text-white shadow-md font-bold"
+                    ? "bg-gradient-to-r from-teal-600 to-cyan-700 text-white shadow-md font-bold"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                <Camera className="w-4 h-4 text-teal-300" />
+                <Camera className={`w-4 h-4 ${inputMode === "CAMERA" ? "text-white" : "text-teal-600"}`} />
                 <span>{isSi ? "කැමරාවෙන් ගන්න" : "Live Camera Capture"}</span>
               </button>
               <button
                 onClick={() => setInputMode("UPLOAD")}
-                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   inputMode === "UPLOAD"
-                    ? "bg-teal-600 text-white shadow-md font-bold"
+                    ? "bg-gradient-to-r from-teal-600 to-cyan-700 text-white shadow-md font-bold"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -410,9 +533,9 @@ export function MedicalReportAnalyzer() {
               </button>
               <button
                 onClick={() => setInputMode("TEXT")}
-                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   inputMode === "TEXT"
-                    ? "bg-teal-600 text-white shadow-md font-bold"
+                    ? "bg-gradient-to-r from-teal-600 to-cyan-700 text-white shadow-md font-bold"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -435,8 +558,9 @@ export function MedicalReportAnalyzer() {
 
                 {!capturedImage ? (
                   /* Live Viewfinder */
-                  <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-black aspect-[4/3] sm:aspect-[16/10] max-w-xl mx-auto flex flex-col justify-between">
+                  <div className="camera-viewfinder-dark relative rounded-2xl overflow-hidden border-2 border-teal-500/40 bg-black aspect-[4/3] sm:aspect-[16/10] max-w-xl mx-auto flex flex-col justify-between shadow-lg">
                     {/* Top Status Overlay */}
+
                     <div className="relative z-10 p-3 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
@@ -583,46 +707,118 @@ export function MedicalReportAnalyzer() {
               </div>
             )}
 
-            {/* FILE UPLOAD SECTION */}
+            {/* FILE UPLOAD SECTION (Supports Multi-Page PDF Booklets & Batch Image Uploads) */}
             {inputMode === "UPLOAD" && (
-              <div
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-800 hover:border-teal-500/60 bg-slate-900/50 hover:bg-slate-900 rounded-2xl p-10 text-center cursor-pointer transition-all space-y-3"
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.webp"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <div className="w-14 h-14 mx-auto rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
-                  <UploadCloud className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-100">
-                    {file
-                      ? file.name
-                      : isSi
-                      ? "ඔබගේ වෛද්‍ය වාර්තාව මෙතැනට Drag & Drop කරන්න"
-                      : "Drag and drop your laboratory report here"}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {file
-                      ? `${(file.size / 1024).toFixed(1)} KB - Ready for diagnostic parsing`
-                      : isSi
-                      ? "PDF, ඡායාරූප (PNG/JPG), TXT, හෝ CSV ගොනු සහාය දක්වයි"
-                      : "Supports PDF, Scans/Photos (PNG, JPG, WEBP), or TXT documents"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 inline-block"
+              <div className="space-y-3">
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-800 hover:border-teal-500/60 bg-slate-900/50 hover:bg-slate-900 rounded-2xl p-8 text-center cursor-pointer transition-all space-y-3"
                 >
-                  {isSi ? "ගොනුව තෝරන්න" : "Browse Files"}
-                </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.webp"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <div className="w-14 h-14 mx-auto rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                    {selectedFiles.length > 1 ? <Files className="w-7 h-7" /> : <UploadCloud className="w-7 h-7" />}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">
+                      {selectedFiles.length > 1
+                        ? isSi
+                          ? `ගොනු / පිටු ${selectedFiles.length}ක් Batch OCR සඳහා තෝරා ඇත`
+                          : `${selectedFiles.length} Report Files / Pages Selected for Batch OCR`
+                        : file
+                        ? file.name
+                        : isSi
+                        ? "බහු-පිටු PDF වාර්තා පොතක් (Multi-Page PDF Booklet) හෝ පිටු කිහිපයක් Drag & Drop කරන්න"
+                        : "Drag & drop a Multi-Page Hospital PDF Booklet (5–15 pages) or multiple page scans"}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {selectedFiles.length > 0
+                        ? `${(selectedFiles.reduce((acc, f) => acc + f.size, 0) / 1024).toFixed(1)} KB total — Ready for Parallel Asynchronous Batch OCR`
+                        : isSi
+                        ? "pdf2image + Async Batch OCR මඟින් පිටු 10ක වාර්තාවක් වුවද තත්පර කිහිපයකින් ස්කෑන් කර එකම Dashboard එකකට ගොනු කරයි"
+                        : "Powered by pdf2image + Parallel Async Batch OCR — scans 10+ page Health Checkup PDFs in seconds"}
+                    </p>
+                  </div>
+
+                  {selectedFiles.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1 max-w-xl mx-auto">
+                      {selectedFiles.map((f, idx) => (
+                        <span
+                          key={`${f.name}-${idx}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-teal-500/40 text-[11px] font-mono text-teal-300"
+                        >
+                          <FileText className="w-3 h-3 text-teal-400 shrink-0" />
+                          <span className="truncate max-w-[180px]">{f.name}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => removeSelectedFile(idx, e)}
+                            className="text-slate-400 hover:text-rose-400 ml-0.5"
+                            title="Remove file"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 inline-flex items-center gap-1.5"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 text-teal-400" />
+                      <span>
+                        {isSi ? "PDF පොතක් හෝ පිටු කිහිපයක් තෝරන්න" : "Browse Multi-Page PDF / Batch Images"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 1-Click Real 6-Page Hospital PDF Booklet Generator & Async Batch OCR Verification */}
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-teal-950/60 via-slate-900 to-indigo-950/60 border border-teal-500/30 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/40 flex items-center justify-center text-teal-300 shrink-0">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-100 flex items-center gap-2">
+                        <span>
+                          {isSi
+                            ? "පිටු 6ක සම්පූර්ණ රෝහල් වාර්තා පොතක් (6-Page PDF Booklet) පරීක්ෂා කරන්න"
+                            : "Test 6-Page Hospital Comprehensive Checkup PDF Booklet"}
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                          pdf2image + Async Batch OCR
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {isSi
+                          ? "පිටු 6ක සැබෑ PDF වාර්තාවක් (FBC, Lipid, HbA1c, Renal, Liver, Thyroid) තත්පර කිහිපයකින් ස්කෑන් කර එකම Dashboard එකකට ගොනු කරයි."
+                          : "Generates & scans a real 6-page PDF booklet (FBC, Lipid, Glycemic, Renal, Liver, Thyroid) into one unified dashboard."}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeSampleMultipagePdf}
+                    disabled={loading}
+                    className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer shrink-0"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>
+                      {isSi ? "පිටු 6ක PDF පොත ස්කෑන් කරන්න" : "Scan 6-Page PDF Booklet Now"}
+                    </span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -681,7 +877,7 @@ export function MedicalReportAnalyzer() {
                 disabled={
                   loading ||
                   (inputMode === "CAMERA" && !capturedImage) ||
-                  (inputMode === "UPLOAD" && !file) ||
+                  (inputMode === "UPLOAD" && !file && selectedFiles.length === 0) ||
                   (inputMode === "TEXT" && !reportText.trim())
                 }
                 className="px-8 py-3 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg transition-all cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2"
@@ -691,8 +887,8 @@ export function MedicalReportAnalyzer() {
                     <Activity className="w-4 h-4 animate-spin" />
                     <span>
                       {isSi
-                        ? "ප්‍රකාශ අක්ෂර හඳුනාගැනීම (OCR) සහ සායනික දත්ත විශ්ලේෂණය වෙමින් පවතී..."
-                        : "Executing High-Precision OCR & Clinical Biomarker Interpretation..."}
+                        ? "බහු-පිටු සමාන්තර OCR (Async Batch OCR) සහ සායනික දත්ත විශ්ලේෂණය වෙමින් පවතී..."
+                        : "Executing Asynchronous Multi-Page Batch OCR & Biomarker Interpretation..."}
                     </span>
                   </>
                 ) : (
@@ -712,6 +908,12 @@ export function MedicalReportAnalyzer() {
             const decreasedList = (isSi ? analysisResult?.decreased_parameters_si : analysisResult?.decreased_parameters_en) || [];
             const correlatedList = analysisResult?.correlated_conditions || [];
             const parametersList = analysisResult?.parameters || [];
+            const filteredParametersList =
+              selectedPageFilter !== null
+                ? parametersList.filter((p) => (p.source_page || 1) === selectedPageFilter)
+                : parametersList;
+            const pageBreakdownList = analysisResult?.page_breakdown || [];
+            const totalPagesScanned = analysisResult?.total_pages_scanned || pageBreakdownList.length || 1;
             const specialistsList = analysisResult?.recommended_specialists || [];
             const directivesList = (isSi ? analysisResult?.clinical_directives_si : analysisResult?.clinical_directives_en) || [];
             const overallStatus = analysisResult?.overall_status || "UNKNOWN";
@@ -747,7 +949,7 @@ export function MedicalReportAnalyzer() {
                           {overallStatusText}
                         </h2>
                         {qualVerdict !== "NOT_APPLICABLE" && (
-                          <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-xs uppercase bg-black/40 border border-current">
+                          <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-xs uppercase bg-teal-950/60 border border-current">
                             <span>
                               {isSi
                                 ? `ප්‍රතිඵලය: ${qualVerdict === "POSITIVE" ? "ධනාත්මකයි (POSITIVE)" : "සෘණාත්මකයි (NEGATIVE)"}`
@@ -755,6 +957,7 @@ export function MedicalReportAnalyzer() {
                             </span>
                           </div>
                         )}
+
                       </div>
                     </div>
 
@@ -768,6 +971,23 @@ export function MedicalReportAnalyzer() {
                           <span>{isSi ? "1990 සුවසැරිය / 911 අමතන්න" : "Emergency Direct Dial"}</span>
                         </a>
                       )}
+                      <button
+                        type="button"
+                        onClick={handleDownloadOfficialPdf}
+                        disabled={downloadingPdf}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg transition-colors border border-emerald-400/40 shrink-0 cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>
+                          {downloadingPdf
+                            ? isSi
+                              ? "PDF සකසමින්..."
+                              : "Generating PDF..."
+                            : isSi
+                            ? "Download Medical Assessment PDF (නිල වාර්තාව)"
+                            : "Download Medical Assessment PDF"}
+                        </span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -794,6 +1014,172 @@ export function MedicalReportAnalyzer() {
                     </div>
                   </div>
                 </div>
+
+                {/* Official Sealed Downloadable Medical Assessment PDF & WhatsApp Doctor Handover Card */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60 border border-emerald-500/40 shadow-lg space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-300 shrink-0">
+                        <Award className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-100 flex flex-wrap items-center gap-2">
+                          <span>
+                            {isSi
+                              ? "වෛද්‍යවරයා වෙත ගෙන යාමට හෝ WhatsApp කිරීමට නිල PDF සාරාංශ වාර්තාව"
+                              : "Official Sealed Medical Assessment PDF & WhatsApp Physician Handover"}
+                          </span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 inline-flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" />
+                            <span>OFFICIAL CLINICAL SEAL</span>
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {isSi
+                            ? "පරීක්ෂා කළ සියලුම අගයන්, වැඩි/අඩු ලක්ෂණ, WHO ICD-11 කේත සහ සායනික උපදෙස් ඇතුළත් නිල මුද්‍රාව සහිත PDF වාර්තාව."
+                            : "Includes all tested biomarkers, High/Low flags, WHO ICD-11 codes, clinical directives, and SHA-256 verification seal."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={pdfPatientName}
+                        onChange={(e) => setPdfPatientName(e.target.value)}
+                        placeholder={isSi ? "රෝගියාගේ නම (Patient Name)" : "Patient Name for PDF"}
+                        className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-emerald-400 w-44"
+                        aria-label="Patient Name for PDF Certificate"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleDownloadOfficialPdf}
+                        disabled={downloadingPdf}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>
+                          {downloadingPdf
+                            ? isSi
+                              ? "බාගත වෙමින්..."
+                              : "Downloading..."
+                            : isSi
+                            ? "Download Medical Assessment PDF"
+                            : "Download Medical Assessment PDF"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowCertificateModal(true)}
+                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-teal-400" />
+                        <span>
+                          {isSi ? "නිල මුද්‍රා සහතිකය (සිංහල/EN)" : "Preview Sealed Certificate"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleShareViaWhatsApp}
+                        className="px-3 py-2 rounded-xl bg-green-700 hover:bg-green-600 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>{isSi ? "WhatsApp (වෛද්‍යවරයාට)" : "WhatsApp to Doctor"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Multi-Page PDF & Asynchronous Batch OCR Breakdown Section */}
+                {pageBreakdownList.length > 0 && (
+                  <div className="p-4 rounded-xl bg-slate-900 border border-teal-500/30 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-teal-400" />
+                        <span className="text-xs font-bold text-teal-300 uppercase tracking-wider">
+                          {isSi
+                            ? `බහු-පිටු වාර්තා පොත් විශ්ලේෂණය (පිටු ${totalPagesScanned}ක් එකම Dashboard එකකට ගොනු කරන ලදී)`
+                            : `Multi-Page Booklet Batch OCR (${totalPagesScanned} Pages Consolidated)`}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+                        {analysisResult?.batch_processing_ms !== undefined && (
+                          <span className="px-2 py-0.5 rounded bg-teal-950/80 text-teal-300 border border-teal-800">
+                            ⚡ {analysisResult.batch_processing_ms} ms
+                          </span>
+                        )}
+                        {analysisResult?.batch_job_id && (
+                          <span className="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800">
+                            Job: {analysisResult.batch_job_id}
+                          </span>
+                        )}
+                        {selectedPageFilter !== null && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPageFilter(null)}
+                            className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-700 hover:bg-indigo-900"
+                          >
+                            {isSi ? "සියලුම පිටු පෙන්වන්න (Show All Pages)" : "Show All Pages"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {pageBreakdownList.map((pg) => {
+                        const isSelected = selectedPageFilter === pg.page_number;
+                        return (
+                          <button
+                            key={pg.page_number}
+                            type="button"
+                            onClick={() =>
+                              setSelectedPageFilter(isSelected ? null : pg.page_number)
+                            }
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-teal-950/60 border-teal-400 shadow-md"
+                                : "bg-slate-950/80 border-slate-800 hover:border-teal-500/50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                                {isSi ? `පිටුව ${pg.page_number}` : `PAGE ${pg.page_number}`}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                                  pg.critical_count > 0
+                                    ? "bg-rose-950 text-rose-300 border-rose-700 font-bold"
+                                    : pg.abnormal_count > 0
+                                    ? "bg-amber-950/80 text-amber-300 border-amber-800"
+                                    : "bg-emerald-950/80 text-emerald-300 border-emerald-800"
+                                }`}
+                              >
+                                {pg.abnormal_count > 0
+                                  ? isSi
+                                    ? `අසාමාන්‍ය ${pg.abnormal_count}`
+                                    : `${pg.abnormal_count} Abnormal`
+                                  : isSi
+                                  ? "සාමාන්‍යයි"
+                                  : "Normal"}
+                              </span>
+                            </div>
+                            <div className="text-xs font-bold text-slate-200 mt-1.5 truncate">
+                              {isSi ? pg.panel_title_si : pg.panel_title_en}
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-1">
+                              <span>
+                                {isSi
+                                  ? `පරීක්ෂණ ${pg.parameters_detected_count}ක්`
+                                  : `${pg.parameters_detected_count} Biomarkers`}
+                              </span>
+                              <span className="text-slate-500">{pg.extraction_method}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Quick Summary Grid: Elevated (Wedi) vs Decreased (Adu) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -883,14 +1269,23 @@ export function MedicalReportAnalyzer() {
                 {/* Detailed Biomarker Breakdown Cards */}
                 <div className="space-y-3">
                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                    <span>{isSi ? "පරීක්ෂා කළ සියලුම ජෛව රසායනික අගයන් (All Tested Parameters)" : "Tested Clinical Biomarkers Breakdown"}</span>
+                    <span>
+                      {isSi
+                        ? "පරීක්ෂා කළ සියලුම ජෛව රසායනික අගයන් (All Tested Parameters)"
+                        : "Tested Clinical Biomarkers Breakdown"}
+                      {selectedPageFilter !== null && (
+                        <span className="ml-2 text-teal-400">
+                          ({isSi ? `පිටුව ${selectedPageFilter} පමණි` : `Filtered: Page ${selectedPageFilter}`})
+                        </span>
+                      )}
+                    </span>
                     <span className="text-[11px] text-slate-500 font-mono">
-                      {analysisResult?.total_parameters_tested ?? parametersList.length} Parameters Evaluated
+                      {filteredParametersList.length} / {analysisResult?.total_parameters_tested ?? parametersList.length} Parameters Evaluated
                     </span>
                   </div>
 
                   <div className="space-y-2">
-                    {parametersList.map((p) => {
+                    {filteredParametersList.map((p) => {
                       const isElevated = p.status === "ELEVATED" || p.status === "CRITICAL_HIGH";
                       const isDecreased = p.status === "DECREASED" || p.status === "CRITICAL_LOW";
                       const isPos = p.status === "POSITIVE";
@@ -915,7 +1310,12 @@ export function MedicalReportAnalyzer() {
                             onClick={() => setExpandedBiomarker(isExpanded ? null : p.canonical_id)}
                             className="flex items-center justify-between cursor-pointer"
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              {p.source_page && totalPagesScanned > 1 && (
+                                <span className="px-1.5 py-0.5 rounded bg-slate-950 text-teal-400 border border-slate-800 text-[10px] font-mono">
+                                  {isSi ? `පිටුව ${p.source_page}` : `P.${p.source_page}`}
+                                </span>
+                              )}
                               <div className="font-semibold text-xs text-slate-200">
                                 {isSi ? p.display_name_si : p.display_name_en}
                               </div>
@@ -1212,6 +1612,231 @@ export function MedicalReportAnalyzer() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Official Sealed Medical Assessment Certificate Modal (Bilingual Sinhala + English Print / PDF / WhatsApp) */}
+      {showCertificateModal && analysisResult && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-4xl w-full max-h-[92vh] overflow-y-auto p-6 space-y-5 shadow-2xl relative">
+            {/* Top Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <Award className="w-5 h-5 text-emerald-400" />
+                <span className="text-sm font-bold text-slate-100">
+                  {isSi
+                    ? "නිල මුද්‍රාව සහිත වෛද්‍ය තක්සේරු සාරාංශ වාර්තාව (Official Clinical Handover Certificate)"
+                    : "Official Sealed Medical Assessment Summary Certificate"}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadOfficialPdf}
+                  disabled={downloadingPdf}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isSi ? "Download Official PDF (.pdf)" : "Download Official PDF (.pdf)"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>{isSi ? "මුද්‍රණය කරන්න (Print)" : "Print Certificate"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShareViaWhatsApp}
+                  className="px-3 py-1.5 rounded-xl bg-green-700 hover:bg-green-600 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCertificateModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Certificate Paper Sheet */}
+            <div className="bg-slate-950 border-2 border-emerald-500/30 rounded-2xl p-6 space-y-5 text-xs">
+              {/* Official Letterhead */}
+              <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-slate-800">
+                <div>
+                  <div className="text-[11px] font-mono text-emerald-400 font-bold tracking-wider uppercase">
+                    MEDGUARD CLINICAL AI — WHO / IFCC STANDARDIZED DIAGNOSTIC HANDOVER
+                  </div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-100 mt-1">
+                    {isSi
+                      ? "සායනික රසායනාගාර පරීක්ෂණ නිල සාරාංශ වාර්තාව"
+                      : "Official Clinical Laboratory Assessment & Physician Handover Report"}
+                  </h2>
+                  <div className="text-[11px] text-slate-400 font-mono mt-1">
+                    Ref ID: {lastGeneratedRefId || analysisResult.batch_job_id || "MGA-PDF-VERIFIED"} • Patient:{" "}
+                    <span className="text-slate-200 font-bold">{pdfPatientName || "Walk-in Patient"}</span> • Pages
+                    Evaluated: {analysisResult.total_pages_scanned || 1}
+                  </div>
+                </div>
+
+                {/* Official Circular Seal Stamp */}
+                <div className="px-4 py-2.5 rounded-2xl border-2 border-double border-emerald-400/70 bg-emerald-950/40 text-center shrink-0">
+                  <div className="flex items-center justify-center gap-1 text-emerald-300 font-mono text-[10px] font-bold uppercase tracking-widest">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>OFFICIAL CLINICAL SEAL</span>
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-100 mt-0.5">
+                    {isSi ? "නිල සායනික තක්සේරු මුද්‍රාව" : "VERIFIED DIAGNOSTIC HANDOVER"}
+                  </div>
+                  <div className="text-[9px] font-mono text-emerald-400/90">
+                    WHO ICD-11 & IFCC COMPLIANT
+                  </div>
+                </div>
+              </div>
+
+              {/* Overall Verdict Box */}
+              <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-mono uppercase text-slate-400">
+                    {isSi ? "සමස්ත සායනික තීරණය / Overall Classification" : "Overall Clinical Classification"}
+                  </div>
+                  <div className="text-sm font-bold text-slate-100 mt-0.5">
+                    {analysisResult.overall_status_si} / {analysisResult.overall_status_en}
+                  </div>
+                </div>
+                {analysisResult.qualitative_verdict !== "NOT_APPLICABLE" && (
+                  <span className="px-3 py-1 rounded-full bg-teal-950 text-teal-300 border border-teal-700 font-mono text-xs font-bold">
+                    Verdict: {analysisResult.qualitative_verdict}
+                  </span>
+                )}
+              </div>
+
+              {/* Elevated vs Decreased Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-800/60 space-y-1">
+                  <div className="font-bold text-rose-300">
+                    ▲ {isSi ? "වැඩි වී ඇති අගයන් (Elevated / High)" : "Elevated / High Biomarkers"} (
+                    {analysisResult.elevated_count})
+                  </div>
+                  <div className="text-slate-300 text-[11px]">
+                    {(isSi ? analysisResult.elevated_parameters_si : analysisResult.elevated_parameters_en)?.join(
+                      ", "
+                    ) || (isSi ? "සාමාන්‍ය සීමාව ඉක්මවා නැත" : "None")}
+                  </div>
+                </div>
+                <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-800/60 space-y-1">
+                  <div className="font-bold text-amber-300">
+                    ▼ {isSi ? "අඩු වී ඇති අගයන් (Decreased / Low)" : "Decreased / Low Biomarkers"} (
+                    {analysisResult.decreased_count})
+                  </div>
+                  <div className="text-slate-300 text-[11px]">
+                    {(isSi ? analysisResult.decreased_parameters_si : analysisResult.decreased_parameters_en)?.join(
+                      ", "
+                    ) || (isSi ? "සාමාන්‍ය සීමාවට වඩා අඩු වී නැත" : "None")}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tested Biomarkers Table */}
+              <div className="space-y-2">
+                <div className="font-bold text-slate-300 uppercase tracking-wider text-[11px]">
+                  {isSi
+                    ? `පරීක්ෂා කළ සියලුම ජෛව රසායනික අගයන් (${analysisResult.parameters?.length || 0})`
+                    : `Complete Tested Biomarkers Table (${analysisResult.parameters?.length || 0})`}
+                </div>
+                <div className="overflow-x-auto rounded-xl border border-slate-800">
+                  <table className="w-full text-left border-collapse text-[11px]">
+                    <thead>
+                      <tr className="bg-slate-900 text-slate-400 font-mono border-b border-slate-800">
+                        <th className="p-2.5">Parameter (පරීක්ෂණය)</th>
+                        <th className="p-2.5">Result (අගය)</th>
+                        <th className="p-2.5">Ref. Interval (සාමාන්‍ය පරාසය)</th>
+                        <th className="p-2.5">Status (තත්ත්වය)</th>
+                        <th className="p-2.5">Page</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/80">
+                      {(analysisResult.parameters || []).map((p) => (
+                        <tr key={p.canonical_id} className="bg-slate-950/60">
+                          <td className="p-2.5 font-semibold text-slate-200">
+                            <div>{p.display_name_en}</div>
+                            <div className="text-[10px] text-slate-400">{p.display_name_si}</div>
+                          </td>
+                          <td className="p-2.5 font-mono font-bold text-slate-100">
+                            {p.raw_value} {p.unit}
+                          </td>
+                          <td className="p-2.5 font-mono text-slate-400">
+                            {p.ref_interval ? `${p.ref_interval} ${p.unit}` : "Qualitative"}
+                          </td>
+                          <td className="p-2.5 font-mono">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] border ${
+                                p.is_critical
+                                  ? "bg-rose-950 text-rose-300 border-rose-700 font-bold"
+                                  : p.is_abnormal
+                                  ? "bg-amber-950 text-amber-300 border-amber-700"
+                                  : "bg-teal-950 text-teal-300 border-teal-800"
+                              }`}
+                            >
+                              {p.status} / {p.status_si}
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-mono text-slate-400">P.{p.source_page || 1}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Correlated ICD-11 Codes */}
+              {(analysisResult.correlated_conditions || []).length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="font-bold text-teal-400 uppercase tracking-wider text-[11px]">
+                    WHO ICD-11 Clinical Correlations (හඳුනාගත් රෝග ලක්ෂණ සහ ICD-11 කේත)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {analysisResult.correlated_conditions.map((c, idx) => (
+                      <div key={idx} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                        <div className="flex items-center justify-between font-bold text-slate-200">
+                          <span>
+                            {c.condition_si} ({c.condition})
+                          </span>
+                          <span className="font-mono text-teal-400 text-[10px]">ICD-11: {c.icd11}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{c.evidence_si || c.evidence}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Clinical Directives */}
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                <div className="font-bold text-slate-200">
+                  {isSi
+                    ? "සායනික උපදෙස් සහ නිර්දේශිත විශේෂඥ වෛද්‍ය අංශ (Clinical Directives & Referrals)"
+                    : "Clinical Directives & Specialist Referrals"}
+                </div>
+                <div className="text-[11px] text-teal-300 font-semibold">
+                  {(analysisResult.recommended_specialists || []).join(" • ")}
+                </div>
+                <ul className="space-y-1 text-slate-300 text-[11px] pt-1">
+                  {((isSi ? analysisResult.clinical_directives_si : analysisResult.clinical_directives_en) || []).map(
+                    (d, i) => (
+                      <li key={i}>• {d}</li>
+                    )
+                  )}
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       )}

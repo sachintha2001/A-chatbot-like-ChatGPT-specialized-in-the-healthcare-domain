@@ -242,28 +242,31 @@ export default function ClinicalTriagePage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-h-[920px] space-y-2">
-      {/* Top Mode Selector & Ontology Launcher */}
-      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 shrink-0 text-xs">
+    <div className="flex flex-col h-[calc(100vh-8.5rem)] max-h-[920px] space-y-2.5">
+      {/* Top Clinical Mode Selector & Quick Diagnostic Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-[#CBE2EA] rounded-2xl px-4 py-2.5 shrink-0 text-xs shadow-clinical-card">
         <div className="flex items-center gap-2">
-          <span className="text-slate-400 font-medium">Triage Mode:</span>
+          <span className="text-[#486581] font-semibold flex items-center gap-1.5">
+            <HeartPulse className="w-4 h-4 text-teal-600" />
+            <span>Clinical Triage Engine:</span>
+          </span>
           <button
             onClick={() => setActiveMode("STREAMING")}
-            className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               activeMode === "STREAMING"
-                ? "bg-teal-600 text-white shadow-sm"
-                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-gradient-to-r from-teal-600 to-cyan-700 text-white shadow-sm"
+                : "bg-[#EBF5F8] text-[#243B53] hover:bg-[#DCEEF4]"
             }`}
           >
-            <Zap className="w-3.5 h-3.5 text-amber-300" />
-            <span>SOCRATES Real-Time SSE Stream</span>
+            <Zap className={`w-3.5 h-3.5 ${activeMode === "STREAMING" ? "text-amber-300" : "text-teal-600"}`} />
+            <span>SOCRATES Real-Time Clinical Stream</span>
           </button>
           <button
             onClick={() => setActiveMode("LEGACY")}
-            className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               activeMode === "LEGACY"
-                ? "bg-slate-700 text-white shadow-sm"
-                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-gradient-to-r from-teal-600 to-cyan-700 text-white shadow-sm"
+                : "bg-[#EBF5F8] text-[#243B53] hover:bg-[#DCEEF4]"
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
@@ -271,16 +274,23 @@ export default function ClinicalTriagePage() {
           </button>
         </div>
 
-        <button
-          onClick={() => setIsOntologyOpen(true)}
-          className="px-3.5 py-1.5 rounded-lg bg-teal-950 hover:bg-teal-900 border border-teal-700/60 text-teal-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>Browse 44+ ICD-11 Pathologies</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>PHI Scrubber + Red-Flag Screen Active</span>
+          </span>
+          <button
+            onClick={() => setIsOntologyOpen(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+          >
+            <Layers className="w-3.5 h-3.5 text-sky-600" />
+            <span>Browse 44+ WHO ICD-11 Pathologies</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Chat Interface */}
+
       {activeMode === "STREAMING" ? (
         <div className="flex-1 min-h-0">
           <StreamingChatView onOpenOntology={() => setIsOntologyOpen(true)} />

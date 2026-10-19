@@ -409,38 +409,38 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-slate-100 rounded-xl border border-slate-800 shadow-2xl overflow-hidden">
-      {/* Top Header */}
-      <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+    <div className="flex flex-col h-full bg-slate-950 text-slate-100 rounded-2xl border border-[#CBE2EA] shadow-clinical-elevated overflow-hidden">
+      {/* Top Clinical Consultation Header */}
+      <div className="clinical-dark-preserve px-5 py-3.5 bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] border-b border-teal-500/30 flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300 shadow-inner">
             <Stethoscope className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-              SOCRATES Clinical Triage Engine
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800">
+            <div className="text-sm font-bold text-white flex items-center gap-2">
+              <span>SOCRATES Clinical Triage & Consultation Workstation</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-400/20 text-teal-200 border border-teal-300/40">
                 ICD-11 Real-Time SSE
               </span>
             </div>
-            <div className="text-xs text-slate-400">
-              Protocolized Symptom Assessment & Hybrid Cloud LLM + PHI Scrubber
+            <div className="text-xs text-cyan-100/80">
+              Protocolized Symptom Assessment • Hybrid Cloud LLM • HIPAA Safe Harbor PHI Scrubber
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Hybrid Cloud LLM Connector Status & Settings Button */}
           <button
             onClick={() => setIsLlmModalOpen(true)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
               llmStatus?.cloud_llm_enabled
-                ? "bg-emerald-950/80 border-emerald-600 text-emerald-300 hover:bg-emerald-900/80"
-                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-teal-300"
+                ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-200 hover:bg-emerald-500/30"
+                : "bg-white/10 hover:bg-white/20 border-white/20 text-teal-200"
             }`}
             title="Configure Hybrid Cloud LLM (Google Gemini 1.5 Pro, Claude 3.5 Sonnet, GPT-4o)"
           >
-            <Cpu className="w-3.5 h-3.5 text-teal-400" />
+            <Cpu className="w-3.5 h-3.5 text-teal-300" />
             <span className="hidden sm:inline">
               {llmStatus?.cloud_llm_enabled
                 ? `Cloud LLM: ${llmStatus.active_model}`
@@ -451,7 +451,7 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           {activePlayingId && (
             <button
               onClick={handleStopAllAudio}
-              className="px-2.5 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors animate-pulse"
+              className="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 border border-rose-400 text-white text-xs font-bold flex items-center gap-1.5 transition-colors animate-pulse"
               title={t.voiceStopAudio}
             >
               <VolumeX className="w-3.5 h-3.5" />
@@ -461,29 +461,29 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
 
           <button
             onClick={() => setAutoReadAloud((prev) => !prev)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors ${
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer ${
               autoReadAloud
-                ? "bg-teal-950/90 border-teal-600 text-teal-300"
-                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400"
+                ? "bg-teal-500/30 border-teal-300 text-white"
+                : "bg-white/10 hover:bg-white/20 border-white/20 text-cyan-100"
             }`}
             title={t.voiceAutoRead}
           >
-            <Volume2 className={`w-3.5 h-3.5 ${autoReadAloud ? "text-teal-400" : "text-slate-400"}`} />
+            <Volume2 className={`w-3.5 h-3.5 ${autoReadAloud ? "text-teal-200" : "text-cyan-200"}`} />
             <span>{t.voiceAutoRead}</span>
           </button>
 
           {onOpenOntology && (
             <button
               onClick={onOpenOntology}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <FileText className="w-3.5 h-3.5 text-teal-400" />
-              ICD-11 Ontology (44 Diseases)
+              <FileText className="w-3.5 h-3.5 text-teal-300" />
+              <span className="hidden md:inline">ICD-11 Ontology (44 Diseases)</span>
             </button>
           )}
           <button
             onClick={resetChat}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-cyan-100 hover:text-white border border-white/15 transition-colors cursor-pointer"
             title="Reset Conversation"
           >
             <RotateCcw className="w-4 h-4" />
@@ -492,58 +492,104 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
       </div>
 
       {/* Message Area */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 clinical-ecg-grid">
         {messages.length === 0 && !isStreaming && (
-          <div className="max-w-xl mx-auto my-10 text-center space-y-4">
-            <div className="w-12 h-12 mx-auto rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
-              <Sparkles className="w-6 h-6" />
+          <div className="max-w-3xl mx-auto my-6 text-center space-y-5">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+              <span>{language === "si" ? "සායනික රෝග විනිශ්චය සහ Triage සහායක" : "Evidence-Grounded Medical Triage & Decision Support"}</span>
             </div>
-            <h2 className="text-lg font-bold text-slate-100">
-              Clinical Conversational Triage (Hybrid Cloud LLM + Local RAG)
-            </h2>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Describe your symptoms naturally in English, Sinhala, or Singlish. Patient identifiers (PHI) are
-              automatically scrubbed via HIPAA Safe Harbor before Hybrid LLM processing, and life-threatening red flags
-              are screened deterministically.
-            </p>
-            <div className="pt-2 flex flex-wrap justify-center gap-2">
+
+            <div className="space-y-2">
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-100">
+                {language === "si"
+                  ? "ඔබගේ රෝග ලක්ෂණ සිංහලෙන්, Singlish හෝ ඉංග්‍රීසියෙන් විස්තර කරන්න"
+                  : "How can MedGuard Clinical AI assist with your symptoms today?"}
+              </h2>
+              <p className="text-xs text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                {language === "si"
+                  ? "රෝගියාගේ පෞද්ගලික තොරතුරු (PHI) ස්වයංක්‍රීයව ඉවත් කර (HIPAA Safe Harbor), හදිසි අවදානම් ලක්ෂණ (Red Flags) සහ WHO ICD-11 සායනික මාර්ගෝපදේශ අනුව ක්ෂණිකව පරීක්ෂා කෙරේ."
+                  : "Describe your symptoms naturally in English, Sinhala, or Singlish. Patient identifiers (PHI) are scrubbed via HIPAA Safe Harbor prior to Hybrid LLM synthesis, and red-flag emergencies are screened in sub-milliseconds."}
+              </p>
+            </div>
+
+            {/* Structured Medical Sample Scenario Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left pt-1">
               <button
-                onClick={() => handleSend("I have a persistent headache")}
-                className="text-xs px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors"
+                onClick={() => handleSend("I have a persistent headache and mild photophobia for 2 days")}
+                className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-teal-500 transition-all group cursor-pointer flex items-start gap-3 shadow-2xs"
               >
-                Intake: "I have a persistent headache"
+                <div className="w-8 h-8 rounded-lg bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-600 shrink-0 mt-0.5">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-100 group-hover:text-teal-700">
+                    Neurological / Routine Intake
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    &ldquo;I have a persistent headache and mild photophobia for 2 days&rdquo;
+                  </div>
+                </div>
               </button>
+
               <button
-                onClick={() => handleSend("Sharp left-sided chest pain worse when breathing")}
-                className="text-xs px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors"
+                onClick={() => handleSend("මට දින 3ක සිට තද උණ, හිසරදය සහ ඇඟපත වේදනාව තියෙනවා")}
+                className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-teal-500 transition-all group cursor-pointer flex items-start gap-3 shadow-2xs"
               >
-                Respiratory: "Sharp chest pain worse on breathing"
+                <div className="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 shrink-0 mt-0.5">
+                  <Stethoscope className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-100 group-hover:text-sky-700">
+                    සිංහල සායනික පරීක්ෂාව (Dengue / Viral Fever)
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    &ldquo;මට දින 3ක සිට තද උණ, හිසරදය සහ ඇඟපත වේදනාව තියෙනවා&rdquo;
+                  </div>
+                </div>
               </button>
+
               <button
-                onClick={() => handleSend("Crushing central chest pain radiating to left arm and jaw")}
-                className="text-xs px-3 py-1.5 rounded-full bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800 text-rose-300 transition-colors"
+                onClick={() => handleSend("Crushing central chest pain radiating to left arm and jaw with sweating")}
+                className="p-3.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800 hover:border-rose-500 transition-all group cursor-pointer flex items-start gap-3 shadow-2xs"
               >
-                Red Flag: "Crushing chest pain radiating to left arm"
+                <div className="w-8 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
+                  <ShieldAlert className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-rose-300">
+                    Cardiac Emergency Red-Flag Protocol (1990)
+                  </div>
+                  <div className="text-[11px] text-rose-400 mt-0.5">
+                    &ldquo;Crushing central chest pain radiating to left arm and jaw&rdquo;
+                  </div>
+                </div>
               </button>
-              <button
-                onClick={() => handleSend("මට දින 3ක සිට තද උණ සහ ඇඟපත වේදනාව තියෙනවා")}
-                className="text-xs px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors font-sans"
-              >
-                Sinhala: "මට දින 3ක සිට තද උණ සහ ඇඟපත වේදනාව"
-              </button>
+
               <button
                 onClick={() =>
                   handleSend(
                     "Mage nama Kamal Perera, phone 077-123-4567. Mata dawas 3k idan thada una saha oluwe kakkuma wamanaya thiyenawa"
                   )
                 }
-                className="text-xs px-3 py-1.5 rounded-full bg-teal-950/60 hover:bg-teal-900/60 border border-teal-800 text-teal-300 transition-colors"
+                className="p-3.5 rounded-xl bg-teal-950/60 hover:bg-teal-900/60 border border-teal-800 hover:border-teal-500 transition-all group cursor-pointer flex items-start gap-3 shadow-2xs"
               >
-                Singlish + PHI Scrub Test: "Mage nama Kamal... dawas 3k idan thada una..."
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-teal-300">
+                    Singlish + Pre-LLM PHI Scrubber Verification
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    &ldquo;Mage nama Kamal... dawas 3k idan thada una saha wamanaya&rdquo;
+                  </div>
+                </div>
               </button>
             </div>
           </div>
         )}
+
 
         {/* Existing Messages */}
         {messages.map((msg) => (

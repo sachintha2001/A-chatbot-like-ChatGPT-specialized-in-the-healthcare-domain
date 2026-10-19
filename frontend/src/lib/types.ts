@@ -293,6 +293,7 @@ export interface ReportBiomarkerParam {
   interpretation_en: string;
   interpretation_si: string;
   related_icd11: string[];
+  source_page?: number;
 }
 
 export interface CorrelatedConditionItem {
@@ -304,8 +305,26 @@ export interface CorrelatedConditionItem {
   urgency: string;
 }
 
+export interface ReportPageBreakdownItem {
+  page_number: number;
+  panel_title_en: string;
+  panel_title_si: string;
+  extraction_method: string;
+  character_count: number;
+  parameters_detected_count: number;
+  abnormal_count: number;
+  critical_count: number;
+  detected_biomarkers_en: string[];
+  detected_biomarkers_si: string[];
+}
+
 export interface ReportAnalysisResult {
   success: boolean;
+  batch_job_id?: string;
+  total_pages_scanned?: number;
+  batch_processing_ms?: number;
+  ocr_engine_mode?: string;
+  page_breakdown?: ReportPageBreakdownItem[];
   overall_status: "ALL_NORMAL" | "ABNORMAL_ELEVATED_RISK" | "CRITICAL_EMERGENCY";
   overall_status_en: string;
   overall_status_si: string;

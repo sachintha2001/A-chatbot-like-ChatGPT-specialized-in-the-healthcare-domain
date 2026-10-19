@@ -81,29 +81,32 @@ export default function ClinicalEvaluationPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 flex flex-wrap items-center justify-between shadow-xs">
-        <div>
-          <div className="flex items-center space-x-2">
-            <ShieldCheck className="w-5 h-5 text-clinical-teal" />
-            <h1 className="text-base font-bold text-clinical-navy">
+      <div className="clinical-dark-preserve bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0D7490] border border-teal-500/30 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-clinical-elevated text-white">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/10 border border-teal-300/30 flex items-center justify-center text-teal-300 shrink-0">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold text-white">
               Clinical Model Evaluation, Safety Benchmarks & Drift Surveillance
             </h1>
+            <p className="text-xs text-cyan-100/80 mt-0.5 max-w-3xl">
+              Standardized multi-case clinical vignettes assessing Groundedness (claim overlap with institutional guidelines),
+              Clinical Relevance, and zero unauthorized prescribing violations.
+            </p>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Standardized multi-case clinical vignettes assessing Groundedness (claim overlap with institutional guidelines),
-            Clinical Relevance, and zero unauthorized prescribing violations.
-          </p>
         </div>
 
         <button
           onClick={handleRunEvaluation}
           disabled={running}
-          className="mt-3 sm:mt-0 px-4 py-2 bg-clinical-teal hover:bg-clinical-teal-hover text-white rounded font-bold text-xs uppercase tracking-wide flex items-center space-x-1.5 transition-colors shadow-xs"
+          className="px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white rounded-xl font-bold text-xs uppercase tracking-wide flex items-center space-x-1.5 transition-colors shadow-md cursor-pointer"
         >
           <Play className="w-3.5 h-3.5 fill-current" />
           <span>{running ? "Executing Vignettes..." : "Run Evaluation Benchmark Suite"}</span>
         </button>
       </div>
+
 
       {statusMsg && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-xs flex items-center space-x-2">
