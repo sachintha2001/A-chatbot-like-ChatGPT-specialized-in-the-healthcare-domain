@@ -5,6 +5,7 @@ from fastapi.responses import Response
 
 from app.engine.report_analyzer import report_analyzer
 from app.knowledge.lab_biomarkers import CLINICAL_BIOMARKER_REGISTRY
+from app.compliance.security_shield import security_shield, SecurityThreatException
 
 router = APIRouter(prefix="/reports", tags=["Clinical Laboratory Report Analysis"])
 
@@ -175,8 +176,23 @@ async def upload_medical_report(
                 detail="Uploaded file is empty."
             )
 
+        # Zero-Trust Anti-Malware, Magic-Byte & PDF Active Exploit Inspection
+        try:
+            inspection = security_shield.inspect_uploaded_file(content, filename)
+            safe_filename = inspection["sanitized_filename"]
+        except SecurityThreatException as threat:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "security_blocked": True,
+                    "threat_category": threat.threat_category,
+                    "message_en": threat.message_en,
+                    "message_si": threat.message_si,
+                }
+            )
+
         analysis = await report_analyzer.analyze_multipage_batch_async(
-            files_payload=[(content, filename)],
+            files_payload=[(content, safe_filename)],
             patient_age_group=patient_age_group,
             biological_sex=biological_sex,
             language=language
@@ -188,13 +204,18 @@ async def upload_medical_report(
                 detail=err_msg or "Unable to extract recognized laboratory biomarker values from the document."
             )
 
+        analysis["security_inspection"] = {
+            "verified": True,
+            "sha256": inspection["sha256"],
+            "engine": "MedGuard-ZeroTrust-AntiMalware-v2",
+        }
         return analysis
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An error occurred while processing the clinical report: {str(e)}"
+            detail="An error occurred while processing the clinical report."
         )
 
 
@@ -217,7 +238,8 @@ async def upload_medical_reports_batch(
             detail="Please provide at least one report file or page image."
         )
 
-    files_payload: List[ tuple[bytes, str] ] = []
+    files_payload: List[tuple[bytes, str]] = []
+    total_batch_bytes = 0
     for f in files[:15]:
         fname = f.filename or "page.png"
         if not any(fname.lower().endswith(ext) for ext in ALLOWED_REPORT_EXTENSIONS):
@@ -227,7 +249,25 @@ async def upload_medical_reports_batch(
             )
         f_bytes = await f.read()
         if f_bytes:
-            files_payload.append((f_bytes, fname))
+            total_batch_bytes += len(f_bytes)
+            if total_batch_bytes > security_shield.MAX_BATCH_UPLOAD_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail="Total batch upload exceeds the 50 MB security quota."
+                )
+            try:
+                inspection = security_shield.inspect_uploaded_file(f_bytes, fname)
+                files_payload.append((f_bytes, inspection["sanitized_filename"]))
+            except SecurityThreatException as threat:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "security_blocked": True,
+                        "threat_category": threat.threat_category,
+                        "message_en": threat.message_en,
+                        "message_si": threat.message_si,
+                    }
+                )
 
     if not files_payload:
         raise HTTPException(
@@ -247,6 +287,11 @@ async def upload_medical_reports_batch(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=err_msg or "Unable to extract recognized laboratory biomarker values across the uploaded batch."
         )
+    analysis["security_inspection"] = {
+        "verified": True,
+        "files_scanned": len(files_payload),
+        "engine": "MedGuard-ZeroTrust-AntiMalware-v2",
+    }
     return analysis
 
 
@@ -290,16 +335,31 @@ async def capture_medical_report_image(payload: CameraImageCaptureRequest):
 
     try:
         image_bytes = base64.b64decode(raw_b64)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid base64 image data: {str(e)}"
+            detail="Invalid base64 image data."
         )
 
     if len(image_bytes) < 100:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Captured image payload is empty or corrupted."
+        )
+
+    try:
+        inspection = security_shield.inspect_uploaded_file(
+            image_bytes, payload.filename or "camera_capture.jpg"
+        )
+    except SecurityThreatException as threat:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "security_blocked": True,
+                "threat_category": threat.threat_category,
+                "message_en": threat.message_en,
+                "message_si": threat.message_si,
+            }
         )
 
     extracted_text = report_analyzer.extract_text_from_image(image_bytes)
@@ -322,7 +382,7 @@ async def capture_medical_report_image(payload: CameraImageCaptureRequest):
             detail=err_msg or "Unable to extract recognized laboratory biomarker values from the captured photo."
         )
 
-    analysis["filename"] = payload.filename or "camera_capture.jpg"
+    analysis["filename"] = inspection["sanitized_filename"]
     analysis["extracted_text_preview"] = extracted_text[:500] + ("..." if len(extracted_text) > 500 else "")
     return analysis
 
@@ -332,8 +392,23 @@ async def analyze_report_text(payload: ReportTextAnalysisRequest):
     """
     Direct text analysis for pasted laboratory values or digital OCR transcripts.
     """
+    try:
+        clean_text = security_shield.inspect_text_input(
+            payload.report_text, context_label="lab_report_text"
+        )
+    except SecurityThreatException as threat:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "security_blocked": True,
+                "threat_category": threat.threat_category,
+                "message_en": threat.message_en,
+                "message_si": threat.message_si,
+            }
+        )
+
     analysis = report_analyzer.analyze_report(
-        raw_text=payload.report_text,
+        raw_text=clean_text,
         patient_age_group=payload.patient_age_group or "ADULT",
         biological_sex=payload.biological_sex or "UNSPECIFIED",
         language=payload.language or "en"
@@ -381,10 +456,28 @@ async def export_clinical_summary_pdf(payload: ExportSummaryPdfRequest):
             detail="Valid analysis_result object is required to generate the Medical Assessment PDF."
         )
 
+    try:
+        safe_patient_name = security_shield.inspect_text_input(
+            payload.patient_name or "Patient / Walk-in", context_label="pdf_patient_name"
+        )
+        safe_patient_age_sex = security_shield.inspect_text_input(
+            payload.patient_age_sex or "Adult / Unspecified", context_label="pdf_patient_age_sex"
+        )
+    except SecurityThreatException as threat:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "security_blocked": True,
+                "threat_category": threat.threat_category,
+                "message_en": threat.message_en,
+                "message_si": threat.message_si,
+            }
+        )
+
     pdf_bytes, filename, ref_id = report_analyzer.generate_clinical_assessment_pdf(
         analysis_result=payload.analysis_result,
-        patient_name=payload.patient_name or "Patient / Walk-in",
-        patient_age_sex=payload.patient_age_sex or "Adult / Unspecified",
+        patient_name=safe_patient_name,
+        patient_age_sex=safe_patient_age_sex,
     )
 
     return Response(

@@ -20,6 +20,7 @@ class HIPAAComplianceAuditLogger:
         self.log_path = log_path or settings.AUDIT_LOG_STORAGE_PATH
         os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
         self.salt = "MEDGUARD_CLINICAL_AUDIT_SALT_2026_HIPAA"
+        self.last_chain_hash = "0" * 64
 
     def _anonymize_ip(self, ip_address: str) -> str:
         if not ip_address or not settings.ANONYMIZE_IP_ADDRESSES:
@@ -39,7 +40,14 @@ class HIPAAComplianceAuditLogger:
     ) -> AuditLogEntry:
         anonymized_ip = self._anonymize_ip(client_ip)
         now = utc_now()
-        meta_dict = metadata or {}
+        meta_dict = dict(metadata or {})
+
+        # Compute tamper-evident SHA-256 chain hash
+        chain_payload = f"{self.last_chain_hash}|{now.isoformat()}|{user_id}|{action_type.value}|{resource_accessed}|{anonymized_ip}"
+        entry_hash = hashlib.sha256(chain_payload.encode("utf-8")).hexdigest()
+        meta_dict["prev_chain_hash"] = self.last_chain_hash[:16]
+        meta_dict["entry_chain_hash"] = entry_hash[:16]
+        self.last_chain_hash = entry_hash
 
         # 1. Persist to relational database
         entry = AuditLogEntry(
@@ -62,6 +70,8 @@ class HIPAAComplianceAuditLogger:
             "resource_accessed": resource_accessed,
             "anonymized_ip_hash": anonymized_ip,
             "compliance_status": compliance_status.value,
+            "prev_hash": meta_dict["prev_chain_hash"],
+            "entry_hash": entry_hash,
             "metadata": meta_dict
         }
 
@@ -76,3 +86,4 @@ class HIPAAComplianceAuditLogger:
 
 
 audit_logger = HIPAAComplianceAuditLogger()
+

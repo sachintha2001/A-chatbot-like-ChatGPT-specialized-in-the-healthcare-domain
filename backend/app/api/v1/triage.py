@@ -27,6 +27,7 @@ from app.auth.security import get_current_user_optional
 from app.compliance.red_flag_detector import red_flag_detector
 from app.compliance.phi_scrubber import phi_scrubber
 from app.compliance.audit_logger import audit_logger
+from app.compliance.security_shield import security_shield, SecurityThreatException
 from app.engine.rag_pipeline import rag_engine
 
 router = APIRouter(prefix="/triage", tags=["Clinical Triage & Patient Encounters"])
@@ -149,8 +150,24 @@ async def process_triage_prompt(
             detail="Active triage session not found. Please initiate a clinical intake session first."
         )
 
+    # 1.5. Zero-Trust WAF & Adversarial Prompt Injection / SQLi / XSS Inspection
+    try:
+        safe_prompt_text = security_shield.inspect_text_input(
+            payload.prompt_text, context_label="triage_prompt"
+        )
+    except SecurityThreatException as threat:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "security_blocked": True,
+                "threat_category": threat.threat_category,
+                "message_en": threat.message_en,
+                "message_si": threat.message_si,
+            }
+        )
+
     # 2. PHI / PII Scrubbing prior to storage and inference
-    redacted_prompt, scrubbed_entities = phi_scrubber.redact(payload.prompt_text)
+    redacted_prompt, scrubbed_entities = phi_scrubber.redact(safe_prompt_text)
 
     # Record patient query message in database with scrubbed text only
     patient_msg = TriageMessage(

@@ -378,6 +378,16 @@ export async function updateHybridLLMConfig(payload: {
   return res.json();
 }
 
+function extractSecurityOrApiError(errorData: any, fallback: string, language?: string): string {
+  const detail = errorData?.detail;
+  if (detail && typeof detail === "object" && detail.security_blocked) {
+    const msg = language === "si" && detail.message_si ? detail.message_si : detail.message_en;
+    return `🛡️ [Security Shield — ${detail.threat_category}]: ${msg}`;
+  }
+  if (typeof detail === "string") return detail;
+  return fallback;
+}
+
 export async function uploadMedicalReportFile(
   file: File,
   params?: {
@@ -399,7 +409,7 @@ export async function uploadMedicalReportFile(
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ detail: "File upload analysis failed" }));
-    throw new Error(errorData.detail || "Medical report analysis failed");
+    throw new Error(extractSecurityOrApiError(errorData, "Medical report analysis failed", params?.language));
   }
   return res.json();
 }
@@ -425,7 +435,7 @@ export async function analyzeReportText(
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ detail: "Text analysis failed" }));
-    throw new Error(errorData.detail || "Failed to analyze report text");
+    throw new Error(extractSecurityOrApiError(errorData, "Failed to analyze report text", params?.language));
   }
   return res.json();
 }
@@ -452,7 +462,7 @@ export async function captureMedicalReportImage(
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ detail: "Camera capture analysis failed" }));
-    throw new Error(errorData.detail || "Medical report camera analysis failed");
+    throw new Error(extractSecurityOrApiError(errorData, "Medical report camera analysis failed", params?.language));
   }
   return res.json();
 }
@@ -486,7 +496,7 @@ export async function uploadMedicalReportsBatch(
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ detail: "Multi-page batch upload analysis failed" }));
-    throw new Error(errorData.detail || "Multi-page medical report analysis failed");
+    throw new Error(extractSecurityOrApiError(errorData, "Multi-page medical report analysis failed", params?.language));
   }
   return res.json();
 }
@@ -506,7 +516,7 @@ export async function analyzeSampleMultipagePdf(params?: {
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ detail: "Sample multi-page PDF analysis failed" }));
-    throw new Error(errorData.detail || "Failed to analyze sample multi-page PDF booklet");
+    throw new Error(extractSecurityOrApiError(errorData, "Failed to analyze sample multi-page PDF booklet", params?.language));
   }
   return res.json();
 }
@@ -528,7 +538,7 @@ export async function downloadMedicalAssessmentPdf(
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ detail: "Failed to generate Medical Assessment PDF" }));
-    throw new Error(errorData.detail || "Failed to generate Medical Assessment PDF");
+    throw new Error(extractSecurityOrApiError(errorData, "Failed to generate Medical Assessment PDF"));
   }
 
   const refId = res.headers.get("X-Report-Ref-Id") || "MGA-PDF-VERIFIED";
@@ -724,5 +734,23 @@ export async function cancelBookedAppointment(bookingId: string): Promise<Appoin
     method: "PATCH"
   });
   if (!res.ok) throw new Error("Failed to cancel appointment");
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Zero-Trust Security Shield, Anti-Malware & DLP Verification API
+// ---------------------------------------------------------------------------
+
+export async function fetchSecurityPosture(): Promise<any> {
+  const res = await fetch(`${API_BASE}/security/status`);
+  if (!res.ok) throw new Error("Failed to fetch security shield posture");
+  return res.json();
+}
+
+export async function runSecuritySelfTest(): Promise<any> {
+  const res = await fetch(`${API_BASE}/security/self-test`, {
+    method: "POST"
+  });
+  if (!res.ok) throw new Error("Failed to execute security self-diagnostic suite");
   return res.json();
 }

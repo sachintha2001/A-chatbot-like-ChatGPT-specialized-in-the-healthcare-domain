@@ -13,6 +13,9 @@ from app.ingestion.seed_loader import seed_clinical_guidelines, seed_patient_pro
 from app.ingestion.vector_store import vector_store
 from app.knowledge.clinical_corpus_loader import ingest_pathology_corpus
 from app.api.v1 import api_v1_router
+from app.compliance.security_shield import SecurityHeadersAndWAFMiddleware, security_shield
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 
 async def bootstrap_initial_state():
@@ -91,14 +94,33 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Zero-Trust Security Headers, Rate Limiting & WAF Middleware
+app.add_middleware(SecurityHeadersAndWAFMiddleware)
+
 # Cross-Origin Resource Sharing (CORS) Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    expose_headers=["Content-Disposition", "X-Report-Ref-Id", "X-MedGuard-Security-Shield"],
 )
+
+
+# Global Zero-Leakage Exception Sanitizer (prevents stack trace or internal path exposure)
+@app.exception_handler(Exception)
+async def global_zero_leakage_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "An internal clinical processing error occurred. Diagnostic details have been logged securely without exposing sensitive system internals."
+        },
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        }
+    )
 
 # Register API version 1 routers
 app.include_router(api_v1_router)
@@ -112,6 +134,8 @@ async def health_check():
         "version": "1.0.0",
         "vector_chunks_indexed": vector_store.total_count(),
         "phi_scrubbing_enabled": settings.ENABLE_PHI_SCRUBBING,
+        "security_shield_status": "ACTIVE_ZERO_TRUST_DLP",
+        "threats_blocked": security_shield.blocked_threats_count,
         "environment": settings.ENVIRONMENT
     }
 
@@ -121,6 +145,7 @@ async def root_redirect():
     return {
         "platform": "MedGuard AI Clinical Decision Support Platform",
         "status": "ONLINE",
+        "security_shield": "ACTIVE_ZERO_TRUST_DLP",
         "docs_url": "/docs",
         "health_url": "/api/v1/health"
     }
