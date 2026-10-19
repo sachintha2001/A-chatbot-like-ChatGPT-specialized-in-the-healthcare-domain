@@ -463,6 +463,54 @@ export async function fetchSampleReports(): Promise<{ samples: any[] }> {
   return res.json();
 }
 
+export async function uploadMedicalReportsBatch(
+  files: File[],
+  params?: {
+    patientAgeGroup?: string;
+    biologicalSex?: string;
+    language?: string;
+  }
+): Promise<any> {
+  const formData = new FormData();
+  for (const f of files) {
+    formData.append("files", f);
+  }
+  if (params?.patientAgeGroup) formData.append("patient_age_group", params.patientAgeGroup);
+  if (params?.biologicalSex) formData.append("biological_sex", params.biologicalSex);
+  if (params?.language) formData.append("language", params.language);
+
+  const res = await fetch(`${API_BASE}/reports/upload-batch`, {
+    method: "POST",
+    body: formData
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Multi-page batch upload analysis failed" }));
+    throw new Error(errorData.detail || "Multi-page medical report analysis failed");
+  }
+  return res.json();
+}
+
+export async function analyzeSampleMultipagePdf(params?: {
+  patientAgeGroup?: string;
+  biologicalSex?: string;
+  language?: string;
+}): Promise<any> {
+  const qs = new URLSearchParams({
+    patient_age_group: params?.patientAgeGroup || "ADULT",
+    biological_sex: params?.biologicalSex || "UNSPECIFIED",
+    language: params?.language || "en"
+  });
+  const res = await fetch(`${API_BASE}/reports/analyze-sample-multipage-pdf?${qs.toString()}`, {
+    method: "POST"
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Sample multi-page PDF analysis failed" }));
+    throw new Error(errorData.detail || "Failed to analyze sample multi-page PDF booklet");
+  }
+  return res.json();
+}
+
 // ---------------------------------------------------------------------------
 // Patient Profiles & Longitudinal EHR Records API
 // ---------------------------------------------------------------------------

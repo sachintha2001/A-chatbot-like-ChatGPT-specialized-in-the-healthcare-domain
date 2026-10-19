@@ -29,12 +29,16 @@ import {
   User,
   ExternalLink,
   X,
-  CalendarCheck
+  CalendarCheck,
+  BookOpen,
+  Files
 } from "lucide-react";
 import Link from "next/link";
 import { ReportAnalysisResult, SampleReportItem, PatientProfileItem } from "@/lib/types";
 import {
   uploadMedicalReportFile,
+  uploadMedicalReportsBatch,
+  analyzeSampleMultipagePdf,
   analyzeReportText,
   fetchSampleReports,
   captureMedicalReportImage,
@@ -48,6 +52,7 @@ export function MedicalReportAnalyzer() {
   const { language } = useLanguage();
   const [inputMode, setInputMode] = useState<"UPLOAD" | "CAMERA" | "TEXT">("UPLOAD");
   const [file, setFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [reportText, setReportText] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -55,6 +60,7 @@ export function MedicalReportAnalyzer() {
   const [samples, setSamples] = useState<SampleReportItem[]>([]);
   const [expandedBiomarker, setExpandedBiomarker] = useState<string | null>(null);
   const [showExtractedOcr, setShowExtractedOcr] = useState(false);
+  const [selectedPageFilter, setSelectedPageFilter] = useState<number | null>(null);
 
   // Specialist Appointment Booking Modal state
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -202,23 +208,58 @@ export function MedicalReportAnalyzer() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const filesArr = Array.from(e.target.files);
+      setSelectedFiles(filesArr);
+      setFile(filesArr[0]);
       setErrorMessage(null);
     }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filesArr = Array.from(e.dataTransfer.files);
+      setSelectedFiles(filesArr);
+      setFile(filesArr[0]);
       setErrorMessage(null);
+    }
+  };
+
+  const removeSelectedFile = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedFiles((prev) => {
+      const next = prev.filter((_, idx) => idx !== index);
+      setFile(next[0] || null);
+      return next;
+    });
+  };
+
+  const handleAnalyzeSampleMultipagePdf = async () => {
+    setLoading(true);
+    setErrorMessage(null);
+    setSelectedPageFilter(null);
+    try {
+      const res = await analyzeSampleMultipagePdf({ language });
+      if (!res || res.success === false) {
+        throw new Error(
+          isSi
+            ? "බහු-පිටු PDF වාර්තා පොත විශ්ලේෂණය කිරීමට නොහැකි විය."
+            : "Failed to analyze the 6-page hospital checkup PDF booklet."
+        );
+      }
+      setAnalysisResult(res);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to process 6-page sample PDF booklet.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleAnalyze = async () => {
     setLoading(true);
     setErrorMessage(null);
+    setSelectedPageFilter(null);
     try {
       if (inputMode === "CAMERA") {
         if (!capturedImage) {
@@ -238,14 +279,18 @@ export function MedicalReportAnalyzer() {
         }
         setAnalysisResult(res);
       } else if (inputMode === "UPLOAD") {
-        if (!file) {
+        const filesToUpload = selectedFiles.length > 0 ? selectedFiles : file ? [file] : [];
+        if (filesToUpload.length === 0) {
           throw new Error(
             isSi
-              ? "කරුණාකර විශ්ලේෂණය සඳහා වෛද්‍ය වාර්තා ගොනුවක් (PDF, පින්තූරයක්, TXT) තෝරන්න."
-              : "Please select a medical report file (PDF, Image, TXT) to upload."
+              ? "කරුණාකර විශ්ලේෂණය සඳහා වෛද්‍ය වාර්තා ගොනුවක් (Multi-page PDF, පින්තූර, TXT) තෝරන්න."
+              : "Please select one or more medical report files (Multi-page PDF, Images, TXT) to upload."
           );
         }
-        const res = await uploadMedicalReportFile(file, { language });
+        const res =
+          filesToUpload.length > 1
+            ? await uploadMedicalReportsBatch(filesToUpload, { language })
+            : await uploadMedicalReportFile(filesToUpload[0], { language });
         if (!res || res.success === false) {
           throw new Error(
             isSi
@@ -288,10 +333,12 @@ export function MedicalReportAnalyzer() {
   const resetAnalysis = () => {
     setAnalysisResult(null);
     setFile(null);
+    setSelectedFiles([]);
     setReportText("");
     setCapturedImage(null);
     setErrorMessage(null);
     setShowExtractedOcr(false);
+    setSelectedPageFilter(null);
   };
 
   const openSaveModal = async () => {
@@ -583,46 +630,118 @@ export function MedicalReportAnalyzer() {
               </div>
             )}
 
-            {/* FILE UPLOAD SECTION */}
+            {/* FILE UPLOAD SECTION (Supports Multi-Page PDF Booklets & Batch Image Uploads) */}
             {inputMode === "UPLOAD" && (
-              <div
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-800 hover:border-teal-500/60 bg-slate-900/50 hover:bg-slate-900 rounded-2xl p-10 text-center cursor-pointer transition-all space-y-3"
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.webp"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <div className="w-14 h-14 mx-auto rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
-                  <UploadCloud className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-100">
-                    {file
-                      ? file.name
-                      : isSi
-                      ? "ඔබගේ වෛද්‍ය වාර්තාව මෙතැනට Drag & Drop කරන්න"
-                      : "Drag and drop your laboratory report here"}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {file
-                      ? `${(file.size / 1024).toFixed(1)} KB - Ready for diagnostic parsing`
-                      : isSi
-                      ? "PDF, ඡායාරූප (PNG/JPG), TXT, හෝ CSV ගොනු සහාය දක්වයි"
-                      : "Supports PDF, Scans/Photos (PNG, JPG, WEBP), or TXT documents"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 inline-block"
+              <div className="space-y-3">
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-800 hover:border-teal-500/60 bg-slate-900/50 hover:bg-slate-900 rounded-2xl p-8 text-center cursor-pointer transition-all space-y-3"
                 >
-                  {isSi ? "ගොනුව තෝරන්න" : "Browse Files"}
-                </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.webp"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <div className="w-14 h-14 mx-auto rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                    {selectedFiles.length > 1 ? <Files className="w-7 h-7" /> : <UploadCloud className="w-7 h-7" />}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">
+                      {selectedFiles.length > 1
+                        ? isSi
+                          ? `ගොනු / පිටු ${selectedFiles.length}ක් Batch OCR සඳහා තෝරා ඇත`
+                          : `${selectedFiles.length} Report Files / Pages Selected for Batch OCR`
+                        : file
+                        ? file.name
+                        : isSi
+                        ? "බහු-පිටු PDF වාර්තා පොතක් (Multi-Page PDF Booklet) හෝ පිටු කිහිපයක් Drag & Drop කරන්න"
+                        : "Drag & drop a Multi-Page Hospital PDF Booklet (5–15 pages) or multiple page scans"}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {selectedFiles.length > 0
+                        ? `${(selectedFiles.reduce((acc, f) => acc + f.size, 0) / 1024).toFixed(1)} KB total — Ready for Parallel Asynchronous Batch OCR`
+                        : isSi
+                        ? "pdf2image + Async Batch OCR මඟින් පිටු 10ක වාර්තාවක් වුවද තත්පර කිහිපයකින් ස්කෑන් කර එකම Dashboard එකකට ගොනු කරයි"
+                        : "Powered by pdf2image + Parallel Async Batch OCR — scans 10+ page Health Checkup PDFs in seconds"}
+                    </p>
+                  </div>
+
+                  {selectedFiles.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1 max-w-xl mx-auto">
+                      {selectedFiles.map((f, idx) => (
+                        <span
+                          key={`${f.name}-${idx}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-teal-500/40 text-[11px] font-mono text-teal-300"
+                        >
+                          <FileText className="w-3 h-3 text-teal-400 shrink-0" />
+                          <span className="truncate max-w-[180px]">{f.name}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => removeSelectedFile(idx, e)}
+                            className="text-slate-400 hover:text-rose-400 ml-0.5"
+                            title="Remove file"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 inline-flex items-center gap-1.5"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 text-teal-400" />
+                      <span>
+                        {isSi ? "PDF පොතක් හෝ පිටු කිහිපයක් තෝරන්න" : "Browse Multi-Page PDF / Batch Images"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 1-Click Real 6-Page Hospital PDF Booklet Generator & Async Batch OCR Verification */}
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-teal-950/60 via-slate-900 to-indigo-950/60 border border-teal-500/30 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/40 flex items-center justify-center text-teal-300 shrink-0">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-100 flex items-center gap-2">
+                        <span>
+                          {isSi
+                            ? "පිටු 6ක සම්පූර්ණ රෝහල් වාර්තා පොතක් (6-Page PDF Booklet) පරීක්ෂා කරන්න"
+                            : "Test 6-Page Hospital Comprehensive Checkup PDF Booklet"}
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                          pdf2image + Async Batch OCR
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {isSi
+                          ? "පිටු 6ක සැබෑ PDF වාර්තාවක් (FBC, Lipid, HbA1c, Renal, Liver, Thyroid) තත්පර කිහිපයකින් ස්කෑන් කර එකම Dashboard එකකට ගොනු කරයි."
+                          : "Generates & scans a real 6-page PDF booklet (FBC, Lipid, Glycemic, Renal, Liver, Thyroid) into one unified dashboard."}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeSampleMultipagePdf}
+                    disabled={loading}
+                    className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer shrink-0"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>
+                      {isSi ? "පිටු 6ක PDF පොත ස්කෑන් කරන්න" : "Scan 6-Page PDF Booklet Now"}
+                    </span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -681,7 +800,7 @@ export function MedicalReportAnalyzer() {
                 disabled={
                   loading ||
                   (inputMode === "CAMERA" && !capturedImage) ||
-                  (inputMode === "UPLOAD" && !file) ||
+                  (inputMode === "UPLOAD" && !file && selectedFiles.length === 0) ||
                   (inputMode === "TEXT" && !reportText.trim())
                 }
                 className="px-8 py-3 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg transition-all cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2"
@@ -691,8 +810,8 @@ export function MedicalReportAnalyzer() {
                     <Activity className="w-4 h-4 animate-spin" />
                     <span>
                       {isSi
-                        ? "ප්‍රකාශ අක්ෂර හඳුනාගැනීම (OCR) සහ සායනික දත්ත විශ්ලේෂණය වෙමින් පවතී..."
-                        : "Executing High-Precision OCR & Clinical Biomarker Interpretation..."}
+                        ? "බහු-පිටු සමාන්තර OCR (Async Batch OCR) සහ සායනික දත්ත විශ්ලේෂණය වෙමින් පවතී..."
+                        : "Executing Asynchronous Multi-Page Batch OCR & Biomarker Interpretation..."}
                     </span>
                   </>
                 ) : (
@@ -712,6 +831,12 @@ export function MedicalReportAnalyzer() {
             const decreasedList = (isSi ? analysisResult?.decreased_parameters_si : analysisResult?.decreased_parameters_en) || [];
             const correlatedList = analysisResult?.correlated_conditions || [];
             const parametersList = analysisResult?.parameters || [];
+            const filteredParametersList =
+              selectedPageFilter !== null
+                ? parametersList.filter((p) => (p.source_page || 1) === selectedPageFilter)
+                : parametersList;
+            const pageBreakdownList = analysisResult?.page_breakdown || [];
+            const totalPagesScanned = analysisResult?.total_pages_scanned || pageBreakdownList.length || 1;
             const specialistsList = analysisResult?.recommended_specialists || [];
             const directivesList = (isSi ? analysisResult?.clinical_directives_si : analysisResult?.clinical_directives_en) || [];
             const overallStatus = analysisResult?.overall_status || "UNKNOWN";
@@ -794,6 +919,97 @@ export function MedicalReportAnalyzer() {
                     </div>
                   </div>
                 </div>
+
+                {/* Multi-Page PDF & Asynchronous Batch OCR Breakdown Section */}
+                {pageBreakdownList.length > 0 && (
+                  <div className="p-4 rounded-xl bg-slate-900 border border-teal-500/30 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-teal-400" />
+                        <span className="text-xs font-bold text-teal-300 uppercase tracking-wider">
+                          {isSi
+                            ? `බහු-පිටු වාර්තා පොත් විශ්ලේෂණය (පිටු ${totalPagesScanned}ක් එකම Dashboard එකකට ගොනු කරන ලදී)`
+                            : `Multi-Page Booklet Batch OCR (${totalPagesScanned} Pages Consolidated)`}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+                        {analysisResult?.batch_processing_ms !== undefined && (
+                          <span className="px-2 py-0.5 rounded bg-teal-950/80 text-teal-300 border border-teal-800">
+                            ⚡ {analysisResult.batch_processing_ms} ms
+                          </span>
+                        )}
+                        {analysisResult?.batch_job_id && (
+                          <span className="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800">
+                            Job: {analysisResult.batch_job_id}
+                          </span>
+                        )}
+                        {selectedPageFilter !== null && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPageFilter(null)}
+                            className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-700 hover:bg-indigo-900"
+                          >
+                            {isSi ? "සියලුම පිටු පෙන්වන්න (Show All Pages)" : "Show All Pages"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {pageBreakdownList.map((pg) => {
+                        const isSelected = selectedPageFilter === pg.page_number;
+                        return (
+                          <button
+                            key={pg.page_number}
+                            type="button"
+                            onClick={() =>
+                              setSelectedPageFilter(isSelected ? null : pg.page_number)
+                            }
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-teal-950/60 border-teal-400 shadow-md"
+                                : "bg-slate-950/80 border-slate-800 hover:border-teal-500/50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                                {isSi ? `පිටුව ${pg.page_number}` : `PAGE ${pg.page_number}`}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                                  pg.critical_count > 0
+                                    ? "bg-rose-950 text-rose-300 border-rose-700 font-bold"
+                                    : pg.abnormal_count > 0
+                                    ? "bg-amber-950/80 text-amber-300 border-amber-800"
+                                    : "bg-emerald-950/80 text-emerald-300 border-emerald-800"
+                                }`}
+                              >
+                                {pg.abnormal_count > 0
+                                  ? isSi
+                                    ? `අසාමාන්‍ය ${pg.abnormal_count}`
+                                    : `${pg.abnormal_count} Abnormal`
+                                  : isSi
+                                  ? "සාමාන්‍යයි"
+                                  : "Normal"}
+                              </span>
+                            </div>
+                            <div className="text-xs font-bold text-slate-200 mt-1.5 truncate">
+                              {isSi ? pg.panel_title_si : pg.panel_title_en}
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-1">
+                              <span>
+                                {isSi
+                                  ? `පරීක්ෂණ ${pg.parameters_detected_count}ක්`
+                                  : `${pg.parameters_detected_count} Biomarkers`}
+                              </span>
+                              <span className="text-slate-500">{pg.extraction_method}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Quick Summary Grid: Elevated (Wedi) vs Decreased (Adu) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -883,14 +1099,23 @@ export function MedicalReportAnalyzer() {
                 {/* Detailed Biomarker Breakdown Cards */}
                 <div className="space-y-3">
                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                    <span>{isSi ? "පරීක්ෂා කළ සියලුම ජෛව රසායනික අගයන් (All Tested Parameters)" : "Tested Clinical Biomarkers Breakdown"}</span>
+                    <span>
+                      {isSi
+                        ? "පරීක්ෂා කළ සියලුම ජෛව රසායනික අගයන් (All Tested Parameters)"
+                        : "Tested Clinical Biomarkers Breakdown"}
+                      {selectedPageFilter !== null && (
+                        <span className="ml-2 text-teal-400">
+                          ({isSi ? `පිටුව ${selectedPageFilter} පමණි` : `Filtered: Page ${selectedPageFilter}`})
+                        </span>
+                      )}
+                    </span>
                     <span className="text-[11px] text-slate-500 font-mono">
-                      {analysisResult?.total_parameters_tested ?? parametersList.length} Parameters Evaluated
+                      {filteredParametersList.length} / {analysisResult?.total_parameters_tested ?? parametersList.length} Parameters Evaluated
                     </span>
                   </div>
 
                   <div className="space-y-2">
-                    {parametersList.map((p) => {
+                    {filteredParametersList.map((p) => {
                       const isElevated = p.status === "ELEVATED" || p.status === "CRITICAL_HIGH";
                       const isDecreased = p.status === "DECREASED" || p.status === "CRITICAL_LOW";
                       const isPos = p.status === "POSITIVE";
@@ -915,7 +1140,12 @@ export function MedicalReportAnalyzer() {
                             onClick={() => setExpandedBiomarker(isExpanded ? null : p.canonical_id)}
                             className="flex items-center justify-between cursor-pointer"
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              {p.source_page && totalPagesScanned > 1 && (
+                                <span className="px-1.5 py-0.5 rounded bg-slate-950 text-teal-400 border border-slate-800 text-[10px] font-mono">
+                                  {isSi ? `පිටුව ${p.source_page}` : `P.${p.source_page}`}
+                                </span>
+                              )}
                               <div className="font-semibold text-xs text-slate-200">
                                 {isSi ? p.display_name_si : p.display_name_en}
                               </div>
