@@ -38,6 +38,18 @@ class ClinicalPlatformSettings(BaseSettings):
     SUICIDE_CRISIS_LIFELINE: str = Field(default="988")
     SUICIDE_CRISIS_LIFELINE_LK: str = Field(default="1926")
 
+    # Hybrid Cloud LLM Configuration (Google Gemini 1.5 Pro, Claude 3.5 Sonnet, OpenAI GPT-4o)
+    LLM_PROVIDER: str = Field(default="auto")  # 'auto' | 'gemini' | 'anthropic' | 'openai' | 'local'
+    GEMINI_API_KEY: str = Field(default="")
+    GEMINI_MODEL: str = Field(default="gemini-1.5-pro")
+    ANTHROPIC_API_KEY: str = Field(default="")
+    ANTHROPIC_MODEL: str = Field(default="claude-3-5-sonnet-20241022")
+    OPENAI_API_KEY: str = Field(default="")
+    OPENAI_MODEL: str = Field(default="gpt-4o")
+    LLM_TEMPERATURE: float = Field(default=0.2)
+    LLM_MAX_TOKENS: int = Field(default=900)
+    LLM_TIMEOUT_SECONDS: float = Field(default=12.0)
+
     BACKEND_CORS_ORIGINS: List[str] = Field(
         default=["http://localhost:3000", "http://127.0.0.1:3000"]
     )

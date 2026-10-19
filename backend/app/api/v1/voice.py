@@ -4,8 +4,15 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-import speech_recognition as sr
-from gtts import gTTS
+try:
+    import speech_recognition as sr
+except ImportError:
+    sr = None  # type: ignore
+
+try:
+    from gtts import gTTS
+except ImportError:
+    gTTS = None  # type: ignore
 
 router = APIRouter(prefix="/voice", tags=["Voice Input & Output (STT / TTS)"])
 

@@ -284,7 +284,8 @@ class SOCRATESTriageStateMachine:
     def process_turn(
         self,
         user_message: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        preferred_language: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Processes a conversational triage turn across the 3 states:
@@ -292,8 +293,15 @@ class SOCRATESTriageStateMachine:
         2. SOCRATES Clarifying Intake
         3. Structured Clinical Assessment
         """
-        is_si = self.is_sinhala(user_message)
-        red_flags = self.screen_red_flags(user_message)
+        from app.engine.llm_connector import hybrid_llm_connector
+
+        # 0. Scrub PHI and normalize complex/Singlish/misspelled narratives first
+        nlu = hybrid_llm_connector.normalize_complex_patient_narrative(user_message)
+        effective_query = nlu["normalized_clinical_query"] or nlu["redacted_text"] or user_message
+        scrubbed_entities = nlu["scrubbed_entities"]
+
+        is_si = preferred_language == "si" or self.is_sinhala(user_message)
+        red_flags = self.screen_red_flags(effective_query)
 
         # STATE 1: RED-FLAG EMERGENCY
         if red_flags:
@@ -338,13 +346,16 @@ class SOCRATESTriageStateMachine:
                     }
                 ],
                 "follow_up_chips": chips,
-                "is_sinhala": is_si
+                "is_sinhala": is_si,
+                "scrubbed_entities": scrubbed_entities,
+                "redacted_query": nlu["redacted_text"],
+                "normalized_query": effective_query
             }
 
         # STATE 2: SOCRATES CLARIFYING INTAKE
-        socrates_eval = self.evaluate_socrates_completeness(user_message, conversation_history)
+        socrates_eval = self.evaluate_socrates_completeness(effective_query, conversation_history)
         if not socrates_eval["is_complete"]:
-            questions, chips = self.generate_intake_questions(user_message, socrates_eval, is_si)
+            questions, chips = self.generate_intake_questions(effective_query, socrates_eval, is_si)
             if is_si:
                 headline = "සායනික තක්සේරුව: රෝග ලක්ෂණ පිළිබඳ වැඩිදුර විස්තර අවශ්‍යයි"
                 body = (
@@ -367,6 +378,7 @@ class SOCRATESTriageStateMachine:
                 "acuity": TriageAcuityLevel.ROUTINE_CLINIC,
                 "headline": headline,
                 "content": body,
+                "intake_questions": questions,
                 "red_flags": [],
                 "citations": [
                     {
@@ -378,11 +390,14 @@ class SOCRATESTriageStateMachine:
                     }
                 ],
                 "follow_up_chips": chips,
-                "is_sinhala": is_si
+                "is_sinhala": is_si,
+                "scrubbed_entities": scrubbed_entities,
+                "redacted_query": nlu["redacted_text"],
+                "normalized_query": effective_query
             }
 
         # STATE 3: STRUCTURED CLINICAL ASSESSMENT
-        assessment_data = self.build_structured_assessment(user_message, is_si)
+        assessment_data = self.build_structured_assessment(effective_query, is_si)
         acuity = assessment_data["acuity"]
 
         if is_si:
@@ -430,8 +445,64 @@ class SOCRATESTriageStateMachine:
             "diagnostic_workup": assessment_data["diagnostic_investigations"],
             "citations": assessment_data["citations"],
             "follow_up_chips": assessment_data["follow_up_chips"],
-            "is_sinhala": is_si
+            "is_sinhala": is_si,
+            "scrubbed_entities": scrubbed_entities,
+            "redacted_query": nlu["redacted_text"],
+            "normalized_query": effective_query
         }
+
+    async def process_turn_hybrid_async(
+        self,
+        user_message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        preferred_language: Optional[str] = None,
+        age_group: str = "ADULT",
+        biological_sex: str = "UNSPECIFIED"
+    ) -> Dict[str, Any]:
+        """
+        Executes the deterministic 3-stage SOCRATES triage state machine and enriches
+        non-emergency conversational responses with the Hybrid Cloud LLM Connector
+        (Google Gemini 1.5 Pro / Claude 3.5 Sonnet / GPT-4o) over PHI-scrubbed text.
+        """
+        from app.engine.llm_connector import hybrid_llm_connector
+
+        base_result = self.process_turn(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            preferred_language=preferred_language
+        )
+
+        # Life-threatening red flags always use deterministic immediate escalation without cloud latency
+        if base_result["state"] == TriageWorkflowState.RED_FLAG_EMERGENCY:
+            provider, model_name = hybrid_llm_connector.resolve_active_provider()
+            base_result["llm_provider"] = "deterministic_safety_gate"
+            base_result["llm_model"] = model_name
+            base_result["cloud_synthesized"] = False
+            return base_result
+
+        effective_query = base_result.get("normalized_query") or user_message
+        raw_chunks = [chunk for chunk, _ in vector_store.search(effective_query, top_k=3)]
+        lang_code = "si" if base_result.get("is_sinhala") else "en"
+
+        hybrid_res = await hybrid_llm_connector.synthesize_hybrid_response_async(
+            raw_patient_query=user_message,
+            context_chunks=raw_chunks,
+            deterministic_fallback_text=base_result["content"],
+            language=lang_code,
+            workflow_state=base_result["state"].value,
+            intake_questions=base_result.get("intake_questions"),
+            differentials=base_result.get("differentials"),
+            conversation_history=conversation_history,
+            age_group=age_group,
+            biological_sex=biological_sex
+        )
+
+        base_result["content"] = hybrid_res["response_text"]
+        base_result["llm_provider"] = hybrid_res["provider_used"]
+        base_result["llm_model"] = hybrid_res["model_used"]
+        base_result["cloud_synthesized"] = hybrid_res["cloud_synthesized"]
+        base_result["scrubbed_entities"] = hybrid_res["scrubbed_entities"]
+        return base_result
 
 
 triage_state_machine = SOCRATESTriageStateMachine()

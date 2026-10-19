@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request, Query
 from fastapi.responses import StreamingResponse
 
 from app.engine.triage_state_machine import triage_state_machine
+from app.engine.llm_connector import hybrid_llm_connector
 
 router = APIRouter(prefix="/chat", tags=["Clinical Conversational Streaming"])
 
@@ -18,10 +19,22 @@ class ChatStreamRequest(BaseModel):
     biological_sex: Optional[str] = "UNSPECIFIED"
 
 
+class HybridLLMConfigRequest(BaseModel):
+    provider: Optional[str] = Field(default=None, description="'auto' | 'gemini' | 'anthropic' | 'openai' | 'local'")
+    gemini_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    gemini_model: Optional[str] = None
+    anthropic_model: Optional[str] = None
+    openai_model: Optional[str] = None
+
+
 async def sse_event_stream(
     message: str,
     history: Optional[List[Dict[str, str]]] = None,
-    preferred_language: Optional[str] = None
+    preferred_language: Optional[str] = None,
+    age_group: str = "ADULT",
+    biological_sex: str = "UNSPECIFIED"
 ):
     """
     Event stream generator yielding Server-Sent Events (SSE):
@@ -36,25 +49,35 @@ async def sse_event_stream(
         data_str = json.dumps(data) if not isinstance(data, str) else json.dumps({"text": data})
         return f"event: {event}\ndata: {data_str}\n\n"
 
+    # Stage 0: Pre-transmission HIPAA Safe Harbor & Sinhala/Singlish PHI Scrubbing
+    yield format_sse("status", {
+        "stage": "scrubbing_phi",
+        "message": "Enforcing HIPAA Safe Harbor PHI Scrubber & normalizing complex narrative..."
+    })
+    await asyncio.sleep(0.03)
+
     # Stage 1: Red-flag screening
     yield format_sse("status", {
         "stage": "screening_red_flags",
         "message": "Screening deterministic red-flag criteria and vital compromise triggers..."
     })
-    await asyncio.sleep(0.04)
-
-    # Process state machine
-    result = triage_state_machine.process_turn(
-        user_message=message,
-        conversation_history=history
-    )
+    await asyncio.sleep(0.03)
 
     # Stage 2: Knowledge retrieval & ontology mapping
     yield format_sse("status", {
         "stage": "knowledge_retrieval",
         "message": "Querying WHO ICD-11 ontology, clinical vector store, and practice guidelines..."
     })
-    await asyncio.sleep(0.04)
+    await asyncio.sleep(0.03)
+
+    # Process Hybrid State Machine + Cloud LLM Connector (over PHI-scrubbed text)
+    result = await triage_state_machine.process_turn_hybrid_async(
+        user_message=message,
+        conversation_history=history,
+        preferred_language=preferred_language,
+        age_group=age_group,
+        biological_sex=biological_sex
+    )
 
     # Stage 3: Immediate triage badge emission before text stream completes
     acuity_val = result["acuity"].value if hasattr(result["acuity"], "value") else str(result["acuity"])
@@ -63,20 +86,24 @@ async def sse_event_stream(
         "state": state_val,
         "acuity": acuity_val,
         "headline": result["headline"],
-        "is_emergency": state_val == "RED_FLAG_EMERGENCY"
+        "is_emergency": state_val == "RED_FLAG_EMERGENCY",
+        "llm_provider": result.get("llm_provider", "local_deterministic"),
+        "llm_model": result.get("llm_model", "MedGuard-Local-Deterministic-RAG"),
+        "cloud_synthesized": result.get("cloud_synthesized", False),
+        "scrubbed_entities": result.get("scrubbed_entities", [])
     })
     await asyncio.sleep(0.02)
 
     # Stage 4: Synthesizing response stage
+    model_label = result.get("llm_model", "Hybrid Engine")
     yield format_sse("status", {
         "stage": "synthesizing_response",
-        "message": "Synthesizing evidence-backed clinical response with safety netting..."
+        "message": f"Synthesizing evidence-backed clinical response ({model_label})..."
     })
-    await asyncio.sleep(0.03)
+    await asyncio.sleep(0.02)
 
     # Stage 5: Token streaming
     content = result["content"]
-    # Split by words preserving punctuation for natural streaming flow
     tokens = content.split(" ")
     for idx, token in enumerate(tokens):
         suffix = " " if idx < len(tokens) - 1 else ""
@@ -84,7 +111,6 @@ async def sse_event_stream(
             "token": token + suffix,
             "index": idx
         })
-        # Ultra-low-latency 12ms delay simulates fluid neural token generation
         await asyncio.sleep(0.012)
 
     # Stage 6: Citations emission
@@ -103,8 +129,38 @@ async def sse_event_stream(
     yield format_sse("done", {
         "status": "complete",
         "state": state_val,
-        "acuity": acuity_val
+        "acuity": acuity_val,
+        "llm_provider": result.get("llm_provider", "local_deterministic"),
+        "llm_model": result.get("llm_model", "MedGuard-Local-Deterministic-RAG"),
+        "cloud_synthesized": result.get("cloud_synthesized", False),
+        "scrubbed_entities": result.get("scrubbed_entities", [])
     })
+
+
+@router.get("/llm-status")
+async def get_hybrid_llm_status():
+    """
+    Returns current Hybrid Cloud LLM Connector configuration, active model,
+    PHI scrubbing enforcement status, and available cloud providers.
+    """
+    return hybrid_llm_connector.get_status()
+
+
+@router.post("/llm-config")
+async def configure_hybrid_llm(payload: HybridLLMConfigRequest):
+    """
+    Dynamically updates the active Hybrid Cloud LLM provider (Google Gemini 1.5 Pro,
+    Claude 3.5 Sonnet, OpenAI GPT-4o, or Local Deterministic Engine) and API keys at runtime.
+    """
+    return hybrid_llm_connector.configure_runtime(
+        provider=payload.provider,
+        gemini_api_key=payload.gemini_api_key,
+        anthropic_api_key=payload.anthropic_api_key,
+        openai_api_key=payload.openai_api_key,
+        gemini_model=payload.gemini_model,
+        anthropic_model=payload.anthropic_model,
+        openai_model=payload.openai_model
+    )
 
 
 @router.post("/stream")
@@ -118,7 +174,9 @@ async def chat_stream_endpoint(request_body: ChatStreamRequest):
         sse_event_stream(
             message=request_body.message,
             history=request_body.conversation_history,
-            preferred_language=request_body.preferred_language
+            preferred_language=request_body.preferred_language,
+            age_group=request_body.age_group or "ADULT",
+            biological_sex=request_body.biological_sex or "UNSPECIFIED"
         ),
         media_type="text/event-stream",
         headers={

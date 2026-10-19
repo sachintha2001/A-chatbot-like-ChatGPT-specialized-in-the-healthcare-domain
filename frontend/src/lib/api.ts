@@ -349,6 +349,30 @@ export async function streamClinicalChat(
   }
 }
 
+export async function fetchHybridLLMStatus(): Promise<any> {
+  const res = await fetch(`${API_BASE}/chat/llm-status`);
+  if (!res.ok) throw new Error("Failed to fetch Hybrid LLM status");
+  return res.json();
+}
+
+export async function updateHybridLLMConfig(payload: {
+  provider?: string;
+  gemini_api_key?: string;
+  anthropic_api_key?: string;
+  openai_api_key?: string;
+  gemini_model?: string;
+  anthropic_model?: string;
+  openai_model?: string;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/chat/llm-config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error("Failed to update Hybrid LLM configuration");
+  return res.json();
+}
+
 export async function uploadMedicalReportFile(
   file: File,
   params?: {

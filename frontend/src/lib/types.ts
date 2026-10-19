@@ -200,6 +200,30 @@ export interface StreamBadgeData {
   acuity: TriageAcuityLevel;
   headline: string;
   is_emergency: boolean;
+  llm_provider?: string;
+  llm_model?: string;
+  cloud_synthesized?: boolean;
+  scrubbed_entities?: string[];
+}
+
+export interface HybridLLMStatus {
+  configured_mode: string;
+  active_provider: string;
+  active_model: string;
+  cloud_llm_enabled: boolean;
+  phi_scrubber_enforced_pre_cloud: boolean;
+  deterministic_red_flag_gate_active: boolean;
+  providers_configured: {
+    gemini: boolean;
+    anthropic: boolean;
+    openai: boolean;
+    local_fallback: boolean;
+  };
+  models: {
+    gemini: string;
+    anthropic: string;
+    openai: string;
+  };
 }
 
 export interface StreamStatusData {
