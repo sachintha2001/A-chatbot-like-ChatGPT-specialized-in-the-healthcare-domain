@@ -92,25 +92,14 @@ export function NavigationHeader() {
         <div className="clinical-dark-preserve bg-gradient-to-r from-[#0A2540] via-[#0E3A5D] to-[#0A2540] text-slate-200 text-xs px-4 py-1.5 border-b border-teal-500/25">
           <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2 tracking-wide">
             <div className="flex items-center space-x-3">
-              <span className="inline-flex items-center font-semibold text-emerald-300 bg-emerald-950/70 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[11px]">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
-                {t.hipaaActive}
-              </span>
-              <button
-                type="button"
-                onClick={handleOpenSecurityCenter}
-                className="inline-flex items-center gap-1.5 font-bold text-teal-200 hover:text-white bg-teal-950/80 hover:bg-teal-900 border border-teal-400/40 px-2.5 py-0.5 rounded-full text-[11px] transition-colors cursor-pointer"
-                title="Open Zero-Trust Anti-Malware, WAF & Data Loss Prevention (DLP) Verification Center"
-              >
-                <Lock className="w-3 h-3 text-emerald-400" />
+              <span className="inline-flex items-center gap-1.5 text-cyan-100/90 text-[11px] font-medium">
+                <HeartPulse className="w-3.5 h-3.5 text-teal-300" />
                 <span>
                   {language === "si"
-                    ? "Zero-Trust ආරක්ෂණ පලිහ (Anti-Malware & DLP)"
-                    : "Zero-Trust Security Shield"}
+                    ? "24/7 විශේෂිත වෛද්‍ය AI සහ රසායනාගාර විශ්ලේෂණ සේවාව"
+                    : "24/7 Specialized Healthcare AI & Clinical Decision Support"}
                 </span>
-              </button>
-              <span className="text-slate-500 hidden lg:inline">|</span>
-              <span className="hidden lg:inline text-cyan-100/90 text-[11px]">{t.phiScrubbedNotice}</span>
+              </span>
             </div>
 
             <div className="flex items-center space-x-2.5">

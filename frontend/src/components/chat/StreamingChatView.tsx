@@ -513,79 +513,79 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
               </p>
             </div>
 
-            {/* Structured Medical Sample Scenario Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left pt-1">
-              <button
-                onClick={() => handleSend("I have a persistent headache and mild photophobia for 2 days")}
-                className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-teal-500 transition-all group cursor-pointer flex items-start gap-3 shadow-2xs"
-              >
+            {/* Production Clinical Intake Capabilities Guide */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left pt-2">
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3 shadow-2xs">
                 <div className="w-8 h-8 rounded-lg bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-600 shrink-0 mt-0.5">
-                  <Activity className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-100 group-hover:text-teal-700">
-                    Neurological / Routine Intake
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    &ldquo;I have a persistent headache and mild photophobia for 2 days&rdquo;
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleSend("මට දින 3ක සිට තද උණ, හිසරදය සහ ඇඟපත වේදනාව තියෙනවා")}
-                className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-teal-500 transition-all group cursor-pointer flex items-start gap-3 shadow-2xs"
-              >
-                <div className="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 shrink-0 mt-0.5">
                   <Stethoscope className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-slate-100 group-hover:text-sky-700">
-                    සිංහල සායනික පරීක්ෂාව (Dengue / Viral Fever)
+                  <div className="text-xs font-bold text-slate-100">
+                    {language === "si"
+                      ? "සිංහල, Singlish සහ ඉංග්‍රීසි රෝග ලක්ෂණ පරීක්ෂාව"
+                      : "Bilingual Symptom & Clinical Intake"}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    &ldquo;මට දින 3ක සිට තද උණ, හිසරදය සහ ඇඟපත වේදනාව තියෙනවා&rdquo;
+                  <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    {language === "si"
+                      ? "ඔබට ඇති ඕනෑම රෝග ලක්ෂණයක්, පවතින කාලය සහ අපහසුතාවය පහතින් ටයිප් කරන්න හෝ මයික්‍රොෆෝනය භාවිත කර පවසන්න."
+                      : "Type or speak your symptoms, duration, and severity below for protocolized SOCRATES clinical assessment."}
                   </div>
                 </div>
-              </button>
+              </div>
 
-              <button
-                onClick={() => handleSend("Crushing central chest pain radiating to left arm and jaw with sweating")}
-                className="p-3.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800 hover:border-rose-500 transition-all group cursor-pointer flex items-start gap-3 shadow-2xs"
-              >
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3 shadow-2xs">
                 <div className="w-8 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
                   <ShieldAlert className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-rose-300">
-                    Cardiac Emergency Red-Flag Protocol (1990)
+                  <div className="text-xs font-bold text-slate-100">
+                    {language === "si"
+                      ? "හදිසි ජීවිත අවදානම් හඳුනාගැනීම (1990 සුවසැරිය)"
+                      : "Instant Red-Flag Emergency Screening (1990)"}
                   </div>
-                  <div className="text-[11px] text-rose-400 mt-0.5">
-                    &ldquo;Crushing central chest pain radiating to left arm and jaw&rdquo;
+                  <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    {language === "si"
+                      ? "හෘදයාබාධ, ආඝාත, ඩෙංගු රක්තපාත හෝ හුස්ම ගැනීමේ අපහසුතා වැනි හදිසි ලක්ෂණ ක්ෂණිකව හඳුනාගෙන හදිසි ප්‍රතිකාර වෙත යොමු කරයි."
+                      : "Automatically detects high-acuity cardiac, neurological, and respiratory red flags with immediate 1990 emergency escalation."}
                   </div>
                 </div>
-              </button>
+              </div>
 
-              <button
-                onClick={() =>
-                  handleSend(
-                    "Mage nama Kamal Perera, phone 077-123-4567. Mata dawas 3k idan thada una saha oluwe kakkuma wamanaya thiyenawa"
-                  )
-                }
-                className="p-3.5 rounded-xl bg-teal-950/60 hover:bg-teal-900/60 border border-teal-800 hover:border-teal-500 transition-all group cursor-pointer flex items-start gap-3 shadow-2xs"
-              >
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3 shadow-2xs">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-teal-300">
-                    Singlish + Pre-LLM PHI Scrubber Verification
+                  <div className="text-xs font-bold text-slate-100">
+                    {language === "si"
+                      ? "100% පෞද්ගලිකත්වය සහ Zero-Trust ආරක්ෂාව"
+                      : "HIPAA Safe Harbor & Zero-Leakage Privacy"}
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    &ldquo;Mage nama Kamal... dawas 3k idan thada una saha wamanaya&rdquo;
+                  <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    {language === "si"
+                      ? "නම, ජාතික හැඳුනුම්පත් අංකය (NIC) සහ දුරකථන අංක වැනි සියලුම පෞද්ගලික දත්ත ස්වයංක්‍රීයව ඉවත් කර (Redact) ආරක්ෂා කෙරේ."
+                      : "Personal identifiers (names, NICs, phone numbers) are automatically scrubbed before clinical reasoning or storage."}
                   </div>
                 </div>
-              </button>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3 shadow-2xs">
+                <div className="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 shrink-0 mt-0.5">
+                  <CalendarCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-100">
+                    {language === "si"
+                      ? "විශේෂඥ වෛද්‍යවරුන් වෙන්කිරීම (eChannelling / Doc990)"
+                      : "Direct Specialist Channelling & SBAR Handover"}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                    {language === "si"
+                      ? "රෝග විනිශ්චයෙන් පසු නිර්දේශිත විශේෂඥ වෛද්‍යවරයා eChannelling, Doc990 හෝ oDoc හරහා ක්ෂණිකව වෙන්කරවා ගත හැක."
+                      : "Seamlessly book SLMC-registered specialists with an automated SBAR clinical handover summary."}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

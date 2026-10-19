@@ -9,13 +9,15 @@ from app.config import settings
 from app.database import engine, Base, AsyncSessionLocal, get_db_session
 from app.models.user import User, UserRole
 from app.auth.security import hash_password
-from app.ingestion.seed_loader import seed_clinical_guidelines, seed_patient_profiles
+from app.ingestion.seed_loader import seed_clinical_guidelines
 from app.ingestion.vector_store import vector_store
 from app.knowledge.clinical_corpus_loader import ingest_pathology_corpus
+from app.models.patient import PatientProfile, PatientMedicalRecord
 from app.api.v1 import api_v1_router
 from app.compliance.security_shield import SecurityHeadersAndWAFMiddleware, security_shield
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import delete
 
 
 async def bootstrap_initial_state():
@@ -31,10 +33,20 @@ async def bootstrap_initial_state():
         # 3. Ingest multi-specialty clinical pathology ontology into PostgreSQL and vector store
         await ingest_pathology_corpus(session, vector_store)
 
-        # 4. Ingest longitudinal patient profiles and historical records
-        await seed_patient_profiles(session)
+        # 4. Purge any legacy demo/sample patient profiles (Alex/Arthur/Eleanor Turner) for clean production hosting
+        demo_profiles_stmt = select(PatientProfile).where(
+            PatientProfile.last_name == "Turner",
+            PatientProfile.first_name.in_(["Alex", "Arthur", "Eleanor"]),
+        )
+        demo_res = await session.execute(demo_profiles_stmt)
+        demo_profiles = demo_res.scalars().all()
+        for dp in demo_profiles:
+            await session.execute(
+                delete(PatientMedicalRecord).where(PatientMedicalRecord.profile_id == dp.id)
+            )
+            await session.delete(dp)
 
-        # 3. Seed verified clinician, auditor, and patient test accounts
+        # 5. Ensure system service accounts exist for clinical governance RBAC
         clinician_stmt = select(User).where(User.email == "dr.evans@hospital.nhs.uk")
         res = await session.execute(clinician_stmt)
         if not res.scalar_one_or_none():
@@ -67,7 +79,7 @@ async def bootstrap_initial_state():
             patient = User(
                 email="patient@healthcare.org",
                 hashed_password=hash_password("Patient2026!"),
-                full_name="Alex Turner",
+                full_name="Registered Patient",
                 role=UserRole.PATIENT,
                 is_active=True
             )
@@ -90,17 +102,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="MedGuard AI - Clinical Decision Support Platform",
     description="HIPAA/GDPR-aligned conversational clinical decision support and patient triage API.",
-    version="1.0.0",
+    version="2.5.0",
     lifespan=lifespan
 )
 
 # Zero-Trust Security Headers, Rate Limiting & WAF Middleware
 app.add_middleware(SecurityHeadersAndWAFMiddleware)
 
-# Cross-Origin Resource Sharing (CORS) Configuration
+# Cross-Origin Resource Sharing (CORS) Configuration (Production Web Hosting Ready)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],

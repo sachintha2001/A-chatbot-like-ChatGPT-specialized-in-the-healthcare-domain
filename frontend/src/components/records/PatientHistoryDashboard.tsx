@@ -460,39 +460,74 @@ export function PatientHistoryDashboard() {
 
         {/* Family Member Profile Pills */}
         <div className="p-4 bg-[#F4FAFC] flex items-center space-x-2 overflow-x-auto scrollbar-none">
-
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap mr-1">
             {isSi ? "සාමාජිකයා:" : "Profiles:"}
           </span>
-          {profiles.map((p) => {
-            const isSelected = p.id === selectedProfileId;
-            return (
-              <button
-                key={p.id}
-                onClick={() => setSelectedProfileId(p.id)}
-                className={`inline-flex items-center px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap border ${
-                  isSelected
-                    ? "bg-clinical-navy text-white border-clinical-navy shadow-xs ring-2 ring-clinical-navy/20"
-                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full mr-2 bg-emerald-400" />
-                {p.full_name}
-                <span
-                  className={`ml-2 px-1.5 py-0.2 rounded text-[10px] font-mono uppercase ${
-                    isSelected ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"
+          {profiles.length === 0 && !loading ? (
+            <button
+              onClick={() => setShowNewProfileModal(true)}
+              className="inline-flex items-center px-3.5 py-1.5 rounded-lg text-xs font-bold bg-teal-600 text-white hover:bg-teal-500 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              {isSi ? "පළමු රෝගී ගිණුම සාදන්න (Create First Patient Profile)" : "Create First Patient Profile"}
+            </button>
+          ) : (
+            profiles.map((p) => {
+              const isSelected = p.id === selectedProfileId;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedProfileId(p.id)}
+                  className={`inline-flex items-center px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap border ${
+                    isSelected
+                      ? "bg-clinical-navy text-white border-clinical-navy shadow-xs ring-2 ring-clinical-navy/20"
+                      : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
                   }`}
                 >
-                  {p.relationship}
-                </span>
-                <span className="ml-1.5 text-[10px] opacity-75">
-                  ({p.total_records})
-                </span>
-              </button>
-            );
-          })}
+                  <span className="w-2 h-2 rounded-full mr-2 bg-emerald-400" />
+                  {p.full_name}
+                  <span
+                    className={`ml-2 px-1.5 py-0.2 rounded text-[10px] font-mono uppercase ${
+                      isSelected ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {p.relationship}
+                  </span>
+                  <span className="ml-1.5 text-[10px] opacity-75">
+                    ({p.total_records})
+                  </span>
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
+
+      {/* Empty State when no Patient Profiles exist */}
+      {profiles.length === 0 && !loading && (
+        <div className="bg-white border border-[#CBE2EA] rounded-2xl p-8 text-center shadow-clinical-card">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-teal-50 border border-teal-200 text-teal-600 flex items-center justify-center mb-3">
+            <Users className="w-7 h-7" />
+          </div>
+          <h2 className="text-base sm:text-lg font-extrabold text-[#0A2540]">
+            {isSi
+              ? "තවමත් රෝගී ගිණුම් ඇතුළත් කර නොමැත"
+              : "No Patient Profiles Registered Yet"}
+          </h2>
+          <p className="text-xs text-slate-600 max-w-lg mx-auto mt-1.5 leading-relaxed">
+            {isSi
+              ? "ඔබගේ හෝ පවුලේ සාමාජිකයන්ගේ රසායනාගාර වාර්තා සහ සෞඛ්‍ය ප්‍රවණතා (Biomarker Trends) ආරක්ෂිතව සටහන් කර ගැනීමට නව රෝගී ගිණුමක් ආරම්භ කරන්න."
+              : "Create your first patient or family member profile to securely store lab reports, track longitudinal biomarker trajectories, and manage clinical history."}
+          </p>
+          <button
+            onClick={() => setShowNewProfileModal(true)}
+            className="mt-4 inline-flex items-center px-5 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-[#0D9488] to-[#0284C7] hover:from-[#0F766E] hover:to-[#0369A1] shadow-md transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            {isSi ? "නව රෝගී ගිණුමක් එක් කරන්න" : "Register First Patient Profile"}
+          </button>
+        </div>
+      )}
 
       {/* Selected Patient Demographic & Summary Card */}
       {currentProfile && (

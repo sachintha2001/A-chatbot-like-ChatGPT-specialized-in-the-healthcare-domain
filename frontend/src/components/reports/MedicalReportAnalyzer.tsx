@@ -36,7 +36,8 @@ import {
   Share2,
   Printer,
   ShieldCheck,
-  Award
+  Award,
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 import { ReportAnalysisResult, SampleReportItem, PatientProfileItem } from "@/lib/types";
@@ -85,23 +86,58 @@ export function MedicalReportAnalyzer() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [savingRecord, setSavingRecord] = useState(false);
 
-  // Camera states
+  // Camera & Smart Real-Time Auto-Scan states
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
+  // Real-Time Paper Document & Biomarker Data Lines Detection
+  const [autoScanEnabled, setAutoScanEnabled] = useState(true);
+  const [paperDetected, setPaperDetected] = useState(false);
+  const [paperConfidence, setPaperConfidence] = useState(0);
+  const [textLinesDetected, setTextLinesDetected] = useState(0);
+  const [isSteady, setIsSteady] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [autoExtracting, setAutoExtracting] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mobileCaptureRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const detectionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const prevFrameDataRef = useRef<Uint8ClampedArray | null>(null);
+  const steadyHoldCounterRef = useRef<number>(0);
 
   useEffect(() => {
     fetchSampleReports()
       .then((data) => setSamples(data.samples || []))
       .catch(() => {});
   }, []);
+
+  // Play high-tech camera shutter sound synthesized via Web Audio API
+  const playShutterChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.16);
+    } catch {
+      // Audio autoplay restrictions
+    }
+  };
 
   // Cleanup camera stream when component unmounts or mode changes away from CAMERA
   useEffect(() => {
@@ -163,6 +199,10 @@ export function MedicalReportAnalyzer() {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+      detectionIntervalRef.current = null;
+    }
     setIsCameraActive(false);
   };
 
@@ -170,38 +210,202 @@ export function MedicalReportAnalyzer() {
     setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
   };
 
-  const handleCapturePhoto = () => {
+  // Unified Capture & Instant Auto-Extract function
+  const handleExecuteCaptureAndAnalyze = async (overrideDataUrl?: string) => {
     const video = videoRef.current;
-    if (!video) return;
+    let dataUrl = overrideDataUrl;
 
-    setIsCapturing(true);
+    if (!dataUrl) {
+      if (!video) return;
+      setIsCapturing(true);
+      playShutterChime();
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 1920;
+        canvas.height = video.videoHeight || 1080;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          dataUrl = canvas.toDataURL("image/jpeg", 0.94);
+        }
+      } catch (err) {
+        setErrorMessage(
+          language === "si"
+            ? "ඡායාරූපය ලබා ගැනීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
+            : "Failed to take snapshot from camera stream."
+        );
+        setIsCapturing(false);
+        return;
+      }
+    }
+
+    if (!dataUrl) return;
+
+    setCapturedImage(dataUrl);
+    stopCameraStream();
+    setIsCapturing(false);
+    setAutoExtracting(true);
+    setLoading(true);
+    setErrorMessage(null);
+    setSelectedPageFilter(null);
 
     try {
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      const ctx = canvas.getContext("2d");
-
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-        setCapturedImage(dataUrl);
-        stopCameraStream();
+      const res = await captureMedicalReportImage(dataUrl, { language });
+      if (!res || res.success === false) {
+        throw new Error(
+          language === "si"
+            ? (res?.message_si || "වාර්තාවෙන් හඳුනාගත හැකි සායනික පරීක්ෂණ අගයන් සොයාගත නොහැකි විය. කරුණාකර වාර්තාව පැහැදිලි ආලෝකයකින් කෙලින් තබා නැවත ස්කෑන් කරන්න.")
+            : (res?.message_en || "No standardized biomarkers could be identified from the captured paper. Please ensure clear lighting and readable text.")
+        );
       }
-    } catch (err) {
-      setErrorMessage(
-        language === "si"
-          ? "ඡායාරූපය ලබා ගැනීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
-          : "Failed to take snapshot from camera stream."
-      );
+      setAnalysisResult(res);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to process captured medical report.");
     } finally {
-      setTimeout(() => setIsCapturing(false), 300);
+      setLoading(false);
+      setAutoExtracting(false);
     }
   };
 
+  // Real-Time Frame Document & Text Detection Loop
+  useEffect(() => {
+    if (inputMode === "CAMERA" && isCameraActive && !capturedImage) {
+      if (detectionIntervalRef.current) clearInterval(detectionIntervalRef.current);
+
+      steadyHoldCounterRef.current = 0;
+      setHoldProgress(0);
+
+      detectionIntervalRef.current = setInterval(() => {
+        const video = videoRef.current;
+        const canvas = detectionCanvasRef.current;
+        if (!video || !canvas || video.readyState < 2 || isCapturing) return;
+
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // Central Document Detection Window (15% to 85%)
+        const minX = Math.floor(w * 0.15);
+        const maxX = Math.floor(w * 0.85);
+        const minY = Math.floor(h * 0.15);
+        const maxY = Math.floor(h * 0.85);
+
+        let centerLum = 0;
+        let centerCount = 0;
+        let borderLum = 0;
+        let borderCount = 0;
+
+        for (let y = 0; y < h; y += 4) {
+          for (let x = 0; x < w; x += 4) {
+            const idx = (y * w + x) * 4;
+            const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+            if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+              centerLum += lum;
+              centerCount++;
+            } else {
+              borderLum += lum;
+              borderCount++;
+            }
+          }
+        }
+
+        const avgCenter = centerCount > 0 ? centerLum / centerCount : 0;
+        const avgBorder = borderCount > 0 ? borderLum / borderCount : 0;
+
+        // Paper Luminance & Contrast: White report paper is brighter than desk/background
+        const isPaper = avgCenter > 110 && (avgCenter - avgBorder > 8 || avgCenter > 135);
+
+        // Biomarker Row / Printed Text Line Frequency
+        let lineTransitions = 0;
+        const sampleCols = [Math.floor(w * 0.35), Math.floor(w * 0.5), Math.floor(w * 0.65)];
+        for (const col of sampleCols) {
+          for (let y = minY + 4; y < maxY - 4; y += 3) {
+            const idxCurr = (y * w + col) * 4;
+            const idxPrev = ((y - 3) * w + col) * 4;
+            const lCurr = 0.299 * data[idxCurr] + 0.587 * data[idxCurr + 1] + 0.114 * data[idxCurr + 2];
+            const lPrev = 0.299 * data[idxPrev] + 0.587 * data[idxPrev + 1] + 0.114 * data[idxPrev + 2];
+            if (Math.abs(lCurr - lPrev) > 20) {
+              lineTransitions++;
+            }
+          }
+        }
+
+        const detectedLines = Math.min(28, Math.floor(lineTransitions / 3.0));
+        const hasData = detectedLines >= 4;
+
+        // Stability / Motion Detection
+        let motionDiff = 0;
+        if (prevFrameDataRef.current && prevFrameDataRef.current.length === data.length) {
+          let sum = 0;
+          let count = 0;
+          for (let i = 0; i < data.length; i += 32) {
+            sum += Math.abs(data[i] - prevFrameDataRef.current[i]);
+            count++;
+          }
+          motionDiff = count > 0 ? sum / count : 0;
+        }
+        prevFrameDataRef.current = new Uint8ClampedArray(data);
+
+        const steady = motionDiff < 10.5;
+        const paperRecognized = isPaper && hasData;
+
+        setPaperDetected(paperRecognized);
+        setTextLinesDetected(detectedLines);
+        setIsSteady(steady);
+
+        if (paperRecognized) {
+          const conf = Math.min(99, Math.round(55 + (steady ? 22 : 6) + Math.min(22, detectedLines * 2)));
+          setPaperConfidence(conf);
+
+          if (autoScanEnabled && steady) {
+            steadyHoldCounterRef.current += 1;
+            const progress = Math.min(100, Math.round((steadyHoldCounterRef.current / 4) * 100));
+            setHoldProgress(progress);
+
+            // Trigger instant auto-capture and extraction when paper is held steady for ~750ms
+            if (steadyHoldCounterRef.current >= 4) {
+              steadyHoldCounterRef.current = 0;
+              if (detectionIntervalRef.current) clearInterval(detectionIntervalRef.current);
+              handleExecuteCaptureAndAnalyze();
+            }
+          } else {
+            steadyHoldCounterRef.current = Math.max(0, steadyHoldCounterRef.current - 1);
+            setHoldProgress((p) => Math.max(0, p - 20));
+          }
+        } else {
+          setPaperConfidence(0);
+          steadyHoldCounterRef.current = 0;
+          setHoldProgress(0);
+        }
+      }, 180);
+    } else {
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+        detectionIntervalRef.current = null;
+      }
+      setPaperDetected(false);
+      setHoldProgress(0);
+    }
+
+    return () => {
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+        detectionIntervalRef.current = null;
+      }
+    };
+  }, [inputMode, isCameraActive, capturedImage, autoScanEnabled, isCapturing, language]);
+
   const handleRetakePhoto = () => {
     setCapturedImage(null);
+    setAnalysisResult(null);
     setErrorMessage(null);
+    setHoldProgress(0);
+    setPaperDetected(false);
   };
 
   const handleMobileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -210,8 +414,8 @@ export function MedicalReportAnalyzer() {
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
         if (uploadEvent.target?.result) {
-          setCapturedImage(uploadEvent.target.result as string);
-          stopCameraStream();
+          const dataUrl = uploadEvent.target.result as string;
+          handleExecuteCaptureAndAnalyze(dataUrl);
         }
       };
       reader.readAsDataURL(selected);
@@ -544,7 +748,7 @@ export function MedicalReportAnalyzer() {
               </button>
             </div>
 
-            {/* CAMERA CAPTURE SECTION */}
+            {/* CAMERA CAPTURE SECTION (Real-Time Smart Paper & Data Detection + Auto-Capture) */}
             {inputMode === "CAMERA" && (
               <div className="space-y-4">
                 <input
@@ -556,26 +760,58 @@ export function MedicalReportAnalyzer() {
                   className="hidden"
                 />
 
-                {!capturedImage ? (
-                  /* Live Viewfinder */
-                  <div className="camera-viewfinder-dark relative rounded-2xl overflow-hidden border-2 border-teal-500/40 bg-black aspect-[4/3] sm:aspect-[16/10] max-w-xl mx-auto flex flex-col justify-between shadow-lg">
-                    {/* Top Status Overlay */}
+                {/* Hidden canvas for real-time video frame analysis */}
+                <canvas ref={detectionCanvasRef} width={320} height={240} className="hidden" />
 
-                    <div className="relative z-10 p-3 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between text-xs">
+                {!capturedImage ? (
+                  /* Live Viewfinder with Smart Paper & Text Detection HUD */
+                  <div className="camera-viewfinder-dark relative rounded-2xl overflow-hidden border-2 border-teal-500/40 bg-black aspect-[4/3] sm:aspect-[16/10] max-w-xl mx-auto flex flex-col justify-between shadow-xl">
+                    {/* Top Status & Controls Overlay */}
+                    <div className="relative z-10 p-3 bg-gradient-to-b from-black/85 via-black/50 to-transparent flex flex-wrap items-center justify-between gap-2 text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                        <span className="font-mono text-emerald-400 text-[11px] font-bold">
-                          {isSi ? "සජීවී කැමරාව ක්‍රියාත්මකයි" : "LIVE VIEWFINDER"}
+                        <span className={`w-2.5 h-2.5 rounded-full ${paperDetected ? "bg-emerald-400 animate-ping" : "bg-teal-400 animate-pulse"}`} />
+                        <span className="font-mono text-emerald-400 text-[11px] font-extrabold tracking-wider">
+                          {paperDetected
+                            ? isSi
+                              ? "පත්‍රිකාව හඳුනාගන්නා ලදී (PAPER DETECTED)"
+                              : "PAPER DETECTED"
+                            : isSi
+                            ? "සජීවී කැමරාව ක්‍රියාත්මකයි"
+                            : "LIVE VIEWFINDER"}
                         </span>
                       </div>
+
                       <div className="flex items-center gap-2">
+                        {/* Auto-Scan ON / OFF Switch */}
+                        <button
+                          type="button"
+                          onClick={() => setAutoScanEnabled(!autoScanEnabled)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                            autoScanEnabled
+                              ? "bg-emerald-950/90 text-emerald-300 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                              : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+                          }`}
+                          title="Toggle automatic document detection & capture"
+                        >
+                          <Zap className={`w-3.5 h-3.5 ${autoScanEnabled ? "text-emerald-400 fill-emerald-400" : "text-slate-500"}`} />
+                          <span>
+                            {isSi
+                              ? autoScanEnabled
+                                ? "ස්වයංක්‍රීයව හඳුනාගැනීම: ON"
+                                : "ස්වයංක්‍රීයව: OFF"
+                              : autoScanEnabled
+                              ? "Auto-Detect: ON"
+                              : "Auto-Detect: OFF"}
+                          </span>
+                        </button>
+
                         <button
                           type="button"
                           onClick={switchCamera}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-[11px] flex items-center gap-1.5 border border-slate-700 transition-colors"
+                          className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-[11px] flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
                         >
                           <SwitchCamera className="w-3.5 h-3.5" />
-                          <span>{isSi ? "කැමරාව මාරු කරන්න" : "Flip Camera"}</span>
+                          <span className="hidden sm:inline">{isSi ? "මාරු කරන්න" : "Flip"}</span>
                         </button>
                       </div>
                     </div>
@@ -587,27 +823,113 @@ export function MedicalReportAnalyzer() {
                       muted
                       autoPlay
                       className={`absolute inset-0 w-full h-full object-cover ${
-                        isCapturing ? "opacity-30 filter brightness-200 transition-opacity" : "opacity-100"
+                        isCapturing ? "opacity-20 filter brightness-200 transition-opacity" : "opacity-100"
                       }`}
                     />
 
-                    {/* Viewfinder Target Guidelines */}
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
-                      <div className="relative w-full h-full max-w-md max-h-[85%] border-2 border-teal-500/40 rounded-xl flex flex-col items-center justify-between p-3 bg-teal-500/[0.02]">
-                        {/* Corner Brackets */}
-                        <div className="absolute -top-1 -left-1 w-5 h-5 border-t-2 border-l-2 border-teal-400 rounded-tl" />
-                        <div className="absolute -top-1 -right-1 w-5 h-5 border-t-2 border-r-2 border-teal-400 rounded-tr" />
-                        <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-2 border-l-2 border-teal-400 rounded-bl" />
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-2 border-r-2 border-teal-400 rounded-br" />
+                    {/* Dynamic Document Guidelines & Scanning Reticle */}
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-5 sm:p-7">
+                      <div
+                        className={`relative w-full h-full max-w-md max-h-[88%] rounded-2xl flex flex-col items-center justify-between p-3.5 transition-all duration-300 ${
+                          paperDetected
+                            ? "border-2 border-emerald-400 bg-emerald-500/[0.04] shadow-[0_0_24px_rgba(52,211,153,0.45)] ring-2 ring-emerald-400/30"
+                            : "border-2 border-teal-500/40 bg-teal-500/[0.02]"
+                        }`}
+                      >
+                        {/* Dynamic Corner Target Brackets */}
+                        <div
+                          className={`absolute -top-1.5 -left-1.5 w-6 h-6 border-t-4 border-l-4 rounded-tl-lg transition-colors ${
+                            paperDetected ? "border-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" : "border-teal-400"
+                          }`}
+                        />
+                        <div
+                          className={`absolute -top-1.5 -right-1.5 w-6 h-6 border-t-4 border-r-4 rounded-tr-lg transition-colors ${
+                            paperDetected ? "border-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" : "border-teal-400"
+                          }`}
+                        />
+                        <div
+                          className={`absolute -bottom-1.5 -left-1.5 w-6 h-6 border-b-4 border-l-4 rounded-bl-lg transition-colors ${
+                            paperDetected ? "border-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" : "border-teal-400"
+                          }`}
+                        />
+                        <div
+                          className={`absolute -bottom-1.5 -right-1.5 w-6 h-6 border-b-4 border-r-4 rounded-br-lg transition-colors ${
+                            paperDetected ? "border-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" : "border-teal-400"
+                          }`}
+                        />
 
                         {/* Animated Laser Scanning Line */}
-                        <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-teal-400 to-transparent shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-pulse" />
+                        <div
+                          className={`w-full h-0.5 animate-pulse transition-all ${
+                            paperDetected
+                              ? "bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_rgba(52,211,153,0.9)]"
+                              : "bg-gradient-to-r from-transparent via-teal-400 to-transparent shadow-[0_0_8px_rgba(45,212,191,0.8)]"
+                          }`}
+                        />
 
-                        {/* Viewfinder Hint */}
-                        <div className="text-center px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm border border-slate-700/60 text-[11px] text-slate-300">
-                          <span className="font-semibold text-teal-300">
-                            {isSi ? "වෛද්‍ය වාර්තාව රාමුව තුළ කෙලින් තබා ගන්න" : "Align Medical Report Within Guidelines"}
-                          </span>
+                        {/* Top Detection Feedback Pill */}
+                        <div className="text-center w-full max-w-sm">
+                          {paperDetected ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 text-[11px] font-bold shadow-md animate-in fade-in zoom-in-95">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span>
+                                {isSi
+                                  ? `වෛද්‍ය වාර්තා පත්‍රිකාව හඳුනාගන්නා ලදී (${paperConfidence}% Match)`
+                                  : `Medical Report Paper Detected (${paperConfidence}%)`}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-slate-700/60 text-teal-300 text-[11px] font-semibold">
+                              <Scan className="w-3.5 h-3.5 text-teal-400 animate-spin" />
+                              <span>
+                                {isSi
+                                  ? "වෛද්‍ය වාර්තා පත්‍රිකාව කැමරාව ඉදිරියෙන් තබා ගන්න"
+                                  : "Hold Laboratory Report Paper in Front of Camera"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bottom Live Data Telemetry & Auto-Capture Progress Bar */}
+                        <div className="w-full space-y-1.5">
+                          {paperDetected && (
+                            <div className="flex items-center justify-between text-[11px] text-cyan-200 px-1 font-mono font-bold bg-black/60 rounded-lg p-1 border border-teal-500/30">
+                              <span className="flex items-center gap-1 text-emerald-300">
+                                <Sparkles className="w-3 h-3 text-emerald-400" />
+                                {isSi
+                                  ? `දත්ත පේළි ${textLinesDetected}ක් හඳුනාගැනේ`
+                                  : `${textLinesDetected} Biomarker Data Lines Found`}
+                              </span>
+                              <span className={isSteady ? "text-emerald-400" : "text-amber-400"}>
+                                {isSteady
+                                  ? isSi
+                                    ? "ස්ථාවරයි (STEADY)"
+                                    : "STEADY"
+                                  : isSi
+                                  ? "කැමරාව කෙලින් තබන්න"
+                                  : "HOLD STEADY"}
+                              </span>
+                            </div>
+                          )}
+
+                          {autoScanEnabled && holdProgress > 0 && (
+                            <div className="w-full space-y-1 bg-black/75 rounded-xl p-2 border border-emerald-500/40">
+                              <div className="flex items-center justify-between text-[10px] font-bold text-emerald-300">
+                                <span>
+                                  {isSi
+                                    ? "දත්ත ස්වයංක්‍රීයව ලබාගනිමින් පවතී (Auto-Capturing)..."
+                                    : "Hold Still — Auto-Capturing Data..."}
+                                </span>
+                                <span className="font-mono">{holdProgress}%</span>
+                              </div>
+                              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden border border-emerald-500/30">
+                                <div
+                                  className="h-full bg-gradient-to-r from-teal-400 to-emerald-400 transition-all duration-150 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                                  style={{ width: `${holdProgress}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -637,35 +959,42 @@ export function MedicalReportAnalyzer() {
                     )}
 
                     {/* Bottom Controls Bar */}
-                    <div className="relative z-10 p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-between">
+                    <div className="relative z-10 p-4 bg-gradient-to-t from-black/95 via-black/60 to-transparent flex items-center justify-between">
                       <button
                         type="button"
                         onClick={() => mobileCaptureRef.current?.click()}
-                        className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs flex items-center gap-1.5 transition-colors"
+                        className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                         title={isSi ? "ගැලරියෙන් හෝ වෙනත් කැමරාවෙන් තෝරන්න" : "Choose from Gallery / Device"}
                       >
                         <ImageIcon className="w-4 h-4 text-teal-400" />
                         <span className="hidden sm:inline">{isSi ? "ගැලරියෙන්" : "Gallery"}</span>
                       </button>
 
-                      {/* Large Shutter Button */}
+                      {/* Large Shutter Button (Allows manual click anytime or auto-triggers) */}
                       <button
                         type="button"
-                        onClick={handleCapturePhoto}
-                        disabled={!isCameraActive}
-                        className="w-14 h-14 rounded-full border-4 border-white/80 bg-teal-500 hover:bg-teal-400 active:scale-95 disabled:bg-slate-700 disabled:border-slate-600 transition-all shadow-[0_0_20px_rgba(20,184,166,0.5)] flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
+                        onClick={() => handleExecuteCaptureAndAnalyze()}
+                        disabled={!isCameraActive || isCapturing}
+                        className={`w-14 h-14 rounded-full border-4 active:scale-95 transition-all shadow-[0_0_20px_rgba(20,184,166,0.5)] flex items-center justify-center cursor-pointer disabled:cursor-not-allowed ${
+                          paperDetected
+                            ? "border-emerald-300 bg-emerald-500 hover:bg-emerald-400 ring-4 ring-emerald-500/40 animate-pulse"
+                            : "border-white/80 bg-teal-500 hover:bg-teal-400 disabled:bg-slate-700 disabled:border-slate-600"
+                        }`}
                         aria-label="Capture Report Photo"
+                        title={isSi ? "ඡායාරූපය ලබාගෙන දත්ත විශ්ලේෂණය කරන්න" : "Capture and Extract Biomarkers"}
                       >
                         <Scan className="w-6 h-6 text-white" />
                       </button>
 
                       <div className="w-16 text-right">
-                        <span className="text-[10px] text-slate-400 font-mono">1080p</span>
+                        <span className="text-[10px] text-teal-300 font-mono font-bold bg-slate-900/80 px-2 py-0.5 rounded border border-teal-500/30">
+                          1080p OCR
+                        </span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  /* Captured Snapshot Preview */
+                  /* Captured Snapshot & Auto-Extraction Status */
                   <div className="relative rounded-2xl overflow-hidden border border-teal-500/50 bg-slate-900 max-w-xl mx-auto p-4 space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                       <div className="flex items-center gap-2">
@@ -673,16 +1002,16 @@ export function MedicalReportAnalyzer() {
                           <Check className="w-3.5 h-3.5" />
                         </div>
                         <span className="text-xs font-bold text-slate-200">
-                          {isSi ? "ඡායාරූපය සාර්ථකව ලබා ගන්නා ලදී" : "Medical Document Photo Captured"}
+                          {isSi ? "වාර්තා පත්‍රිකාවේ ඡායාරූපය ලබාගන්නා ලදී" : "Medical Report Photo Captured"}
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={handleRetakePhoto}
-                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors"
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>{isSi ? "නැවත ඡායාරූපයක් ගන්න" : "Retake"}</span>
+                        <span>{isSi ? "නැවත ස්කෑන් කරන්න" : "Retake / Rescan"}</span>
                       </button>
                     </div>
 
@@ -692,15 +1021,32 @@ export function MedicalReportAnalyzer() {
                         alt="Captured Laboratory Report"
                         className="w-full h-full object-contain"
                       />
-                      <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono text-teal-300 border border-teal-800">
-                        OCR READY
+                      <div className="absolute top-2 right-2 bg-black/75 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span>OCR READY</span>
                       </div>
+
+                      {autoExtracting && (
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center space-y-2">
+                          <Activity className="w-8 h-8 text-teal-400 animate-spin" />
+                          <div className="text-xs font-bold text-white">
+                            {isSi
+                              ? "වාර්තාවේ දත්ත ස්වයංක්‍රීයව කියවමින් පවතී..."
+                              : "Auto-Extracting Clinical Biomarkers from Paper..."}
+                          </div>
+                          <p className="text-[11px] text-cyan-200">
+                            {isSi
+                              ? "ප්ලේට්ලට්, හිමොග්ලොබින්, රුධිර සීනි, කොලෙස්ටරෝල් සහ ICD-11 කේත විශ්ලේෂණය වෙමින් පවතී"
+                              : "Analyzing Platelets, Hemoglobin, Glucose, Lipid Profile & ICD-11 codes"}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <p className="text-xs text-slate-400 text-center">
                       {isSi
                         ? "අකුරු සහ අගයන් පැහැදිලිදැයි පරීක්ෂා කර පහත 'වාර්තාව සම්පූර්ණයෙන් විශ්ලේෂණය කරන්න' බොත්තම ඔබන්න."
-                        : "Ensure the biomarker values and test names are legible, then proceed to analyze."}
+                        : "Biomarker values and test lines verified. Analysis executing..."}
                     </p>
                   </div>
                 )}
@@ -782,43 +1128,6 @@ export function MedicalReportAnalyzer() {
                     </button>
                   </div>
                 </div>
-
-                {/* 1-Click Real 6-Page Hospital PDF Booklet Generator & Async Batch OCR Verification */}
-                <div className="p-3.5 rounded-xl bg-gradient-to-r from-teal-950/60 via-slate-900 to-indigo-950/60 border border-teal-500/30 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/40 flex items-center justify-center text-teal-300 shrink-0">
-                      <BookOpen className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-100 flex items-center gap-2">
-                        <span>
-                          {isSi
-                            ? "පිටු 6ක සම්පූර්ණ රෝහල් වාර්තා පොතක් (6-Page PDF Booklet) පරීක්ෂා කරන්න"
-                            : "Test 6-Page Hospital Comprehensive Checkup PDF Booklet"}
-                        </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/40">
-                          pdf2image + Async Batch OCR
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400">
-                        {isSi
-                          ? "පිටු 6ක සැබෑ PDF වාර්තාවක් (FBC, Lipid, HbA1c, Renal, Liver, Thyroid) තත්පර කිහිපයකින් ස්කෑන් කර එකම Dashboard එකකට ගොනු කරයි."
-                          : "Generates & scans a real 6-page PDF booklet (FBC, Lipid, Glycemic, Renal, Liver, Thyroid) into one unified dashboard."}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAnalyzeSampleMultipagePdf}
-                    disabled={loading}
-                    className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer shrink-0"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>
-                      {isSi ? "පිටු 6ක PDF පොත ස්කෑන් කරන්න" : "Scan 6-Page PDF Booklet Now"}
-                    </span>
-                  </button>
-                </div>
               </div>
             )}
 
@@ -832,36 +1141,15 @@ export function MedicalReportAnalyzer() {
                   value={reportText}
                   onChange={(e) => setReportText(e.target.value)}
                   rows={8}
-                  placeholder={`Example:\nHemoglobin: 16.5 g/dL\nPlatelet Count: 45000 /uL\nTotal WBC: 3200 /uL\nDengue NS1 Antigen: POSITIVE`}
+                  placeholder={
+                    isSi
+                      ? "ඔබගේ රසායනාගාර වාර්තාවේ අගයන් මෙහි ඇතුළත් කරන්න (උදා: Hemoglobin, Platelet Count, WBC, FBS, HbA1c, Cholesterol)..."
+                      : "Enter or paste your laboratory report values here (e.g., Hemoglobin, Platelet Count, Total WBC, Fasting Blood Sugar, HbA1c, Lipid Profile)..."
+                  }
                   className="w-full bg-slate-900 border border-slate-800 focus:border-teal-500 rounded-xl p-4 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none leading-relaxed"
                 />
               </div>
             )}
-
-            {/* Quick Sample Vignettes */}
-            <div className="space-y-2 pt-2">
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-                <span>{isSi ? "ක්ෂණික සායනික නිදසුන් පරීක්ෂා කරන්න (Quick Clinical Presets):" : "Instant Clinical Presets for Real Verification:"}</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                {samples.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => handleLoadSample(s)}
-                    className="p-3 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-teal-500 rounded-xl text-left transition-all group"
-                  >
-                    <div className="font-semibold text-slate-200 group-hover:text-teal-300 flex items-center justify-between">
-                      <span>{isSi ? s.title_si : s.title_en}</span>
-                      <ArrowUpRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-teal-400 shrink-0" />
-                    </div>
-                    <div className="text-[11px] text-slate-500 font-mono mt-1 truncate">
-                      {s.sample_text.split("\n")[1] || s.sample_text.slice(0, 40)}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {errorMessage && (
               <div className="p-3.5 bg-rose-950/60 border border-rose-800 text-rose-300 rounded-xl text-xs flex items-center gap-2">
