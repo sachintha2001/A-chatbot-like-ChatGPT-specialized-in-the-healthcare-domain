@@ -20,7 +20,8 @@ import {
   Volume2,
   VolumeX,
   Radio,
-  Cpu
+  Cpu,
+  CalendarCheck
 } from "lucide-react";
 import {
   StreamCitation,
@@ -37,6 +38,7 @@ import {
   ClinicalSpeechRecognizer,
   isSpeechRecognitionSupported
 } from "@/lib/voice";
+import { AppointmentBookingModal } from "@/components/telemedicine/AppointmentBookingModal";
 
 interface ChatMessage {
   id: string;
@@ -72,6 +74,12 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
   const [anthropicKey, setAnthropicKey] = useState("");
   const [openaiKey, setOpenaiKey] = useState("");
   const [savingLlmConfig, setSavingLlmConfig] = useState(false);
+
+  // Telemedicine & Specialist Booking Modal State
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [bookingHeadline, setBookingHeadline] = useState("");
+  const [bookingAcuity, setBookingAcuity] = useState("ROUTINE");
+  const [bookingSummary, setBookingSummary] = useState("");
 
   // Voice Engine States
   const [autoReadAloud, setAutoReadAloud] = useState<boolean>(false);
@@ -353,15 +361,30 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
               <div className="text-sm font-bold mt-0.5">{badge.headline}</div>
             </div>
           </div>
-          {isEmerg && (
-            <a
-              href="tel:911"
-              className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold shrink-0 transition-colors shadow-sm"
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {isEmerg && (
+              <a
+                href="tel:1990"
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-bold shrink-0 transition-colors shadow-sm"
+              >
+                <PhoneCall className="w-3.5 h-3.5" />
+                Call 1990 / 911
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setBookingHeadline(badge.headline || "");
+                setBookingAcuity(badge.acuity || "ROUTINE");
+                setBookingSummary(`${badge.headline || "Clinical Triage"} (Acuity: ${badge.acuity})`);
+                setIsBookingModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold shrink-0 transition-colors shadow-sm cursor-pointer"
             >
-              <PhoneCall className="w-3.5 h-3.5" />
-              Call 911 / 1990
-            </a>
-          )}
+              <CalendarCheck className="w-3.5 h-3.5" />
+              <span>{language === "si" ? "වෛද්‍යවරයෙකු වෙන්කරන්න (Book)" : "Book Specialist (eChannelling / Doc990)"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Hybrid LLM & Pre-Transmission PHI Scrubber Telemetry Row */}
@@ -925,6 +948,15 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           </div>
         </div>
       )}
+
+      {/* Telemedicine & Specialist Doctor Appointment Booking Modal */}
+      <AppointmentBookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        specialtyHint={bookingHeadline}
+        clinicalContext={bookingSummary}
+        triageAcuity={bookingAcuity}
+      />
     </div>
   );
 }

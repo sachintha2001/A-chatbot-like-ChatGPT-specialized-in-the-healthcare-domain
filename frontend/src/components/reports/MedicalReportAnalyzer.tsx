@@ -28,7 +28,8 @@ import {
   BookmarkPlus,
   User,
   ExternalLink,
-  X
+  X,
+  CalendarCheck
 } from "lucide-react";
 import Link from "next/link";
 import { ReportAnalysisResult, SampleReportItem, PatientProfileItem } from "@/lib/types";
@@ -41,6 +42,7 @@ import {
   createPatientRecord
 } from "@/lib/api";
 import { useLanguage } from "@/lib/LanguageContext";
+import { AppointmentBookingModal } from "@/components/telemedicine/AppointmentBookingModal";
 
 export function MedicalReportAnalyzer() {
   const { language } = useLanguage();
@@ -53,6 +55,10 @@ export function MedicalReportAnalyzer() {
   const [samples, setSamples] = useState<SampleReportItem[]>([]);
   const [expandedBiomarker, setExpandedBiomarker] = useState<string | null>(null);
   const [showExtractedOcr, setShowExtractedOcr] = useState(false);
+
+  // Specialist Appointment Booking Modal state
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [bookingSpecialtyHint, setBookingSpecialtyHint] = useState<string>("");
 
   // Save to EHR profile state
   const [profiles, setProfiles] = useState<PatientProfileItem[]>([]);
@@ -764,6 +770,21 @@ export function MedicalReportAnalyzer() {
                       )}
                       <button
                         type="button"
+                        onClick={() => {
+                          setBookingSpecialtyHint(specialistsList[0] || "");
+                          setIsBookingModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg transition-colors border border-indigo-400/30 shrink-0 cursor-pointer"
+                      >
+                        <CalendarCheck className="w-4 h-4" />
+                        <span>
+                          {isSi
+                            ? "වෛද්‍ය හමුවක් වෙන්කරන්න (eChannelling / Doc990)"
+                            : "Book Specialist (eChannelling / Doc990)"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={openSaveModal}
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold shadow-lg transition-colors border border-teal-400/30 shrink-0"
                       >
@@ -974,21 +995,57 @@ export function MedicalReportAnalyzer() {
                   </div>
                 )}
 
-                {/* Recommended Specialists */}
+                {/* Recommended Specialists & Instant Booking */}
                 {specialistsList.length > 0 && (
-                  <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
-                    <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                      <Stethoscope className="w-4 h-4 text-teal-400" />
-                      <span>{isSi ? "නිර්දේශිත විශේෂඥ වෛද්‍ය අංශ (Recommended Specialists)" : "Recommended Specialist Referrals"}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {specialistsList.map((spec, i) => (
-                        <span
-                          key={i}
-                          className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-300 text-xs font-medium"
-                        >
-                          {spec}
+                  <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <Stethoscope className="w-4 h-4 text-teal-400" />
+                        <span>
+                          {isSi
+                            ? "නිර්දේශිත විශේෂඥ වෛද්‍ය අංශ සහ ක්ෂණික වෙන්කිරීම (eChannelling / Doc990)"
+                            : "Recommended Specialist Referrals & Instant Channelling"}
                         </span>
+                      </div>
+                      <Link
+                        href="/telemedicine"
+                        className="text-[11px] font-semibold text-teal-400 hover:text-teal-300 flex items-center gap-1"
+                      >
+                        <span>{isSi ? "සියලුම වෛද්‍යවරුන් බලන්න" : "View Full Specialist Directory"}</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                      {specialistsList.map((spec, i) => (
+                        <div
+                          key={i}
+                          className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-teal-500/60 flex items-center justify-between gap-3 transition-all"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
+                              <Stethoscope className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-200 text-xs">{spec}</div>
+                              <div className="text-[10px] text-slate-400">
+                                {isSi
+                                  ? "eChannelling • Doc990 • oDoc Video"
+                                  : "Available on eChannelling, Doc990 & oDoc"}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBookingSpecialtyHint(spec);
+                              setIsBookingModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-bold flex items-center gap-1.5 shrink-0 shadow-sm transition-colors cursor-pointer"
+                          >
+                            <CalendarCheck className="w-3.5 h-3.5" />
+                            <span>{isSi ? "වෙන්කරන්න (Book)" : "Book Now"}</span>
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -1158,6 +1215,26 @@ export function MedicalReportAnalyzer() {
           </div>
         </div>
       )}
+
+      {/* Specialist Appointment Booking Modal (eChannelling / Doc990 / oDoc) */}
+      <AppointmentBookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        specialtyHint={bookingSpecialtyHint || analysisResult?.recommended_specialists?.[0]}
+        clinicalContext={
+          analysisResult
+            ? `${analysisResult.overall_status_en}. Elevated: ${(analysisResult.elevated_parameters_en || []).join(", ") || "None"}. Decreased: ${(analysisResult.decreased_parameters_en || []).join(", ") || "None"}.`
+            : ""
+        }
+        triageAcuity={
+          analysisResult?.is_emergency
+            ? "EMERGENCY"
+            : analysisResult?.overall_status === "ABNORMAL_ELEVATED_RISK"
+            ? "URGENT"
+            : "ROUTINE"
+        }
+        icd11Codes={(analysisResult?.correlated_conditions || []).map((c) => c.icd11)}
+      />
     </div>
   );
 }

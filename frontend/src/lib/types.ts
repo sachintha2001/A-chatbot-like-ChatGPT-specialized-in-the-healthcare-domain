@@ -424,5 +424,84 @@ export interface PatientTrendsResponse {
   longitudinal_summary_si: string;
 }
 
+export interface SpecialistDoctor {
+  doctor_id: string;
+  full_name_en: string;
+  full_name_si: string;
+  qualifications: string;
+  slmc_reg_no: string;
+  specialty_code: string;
+  specialty_en: string;
+  specialty_si: string;
+  primary_hospital_en: string;
+  primary_hospital_si: string;
+  visiting_hospitals: string[];
+  supported_modes: string[];
+  supported_gateways: string[];
+  consultation_fee_lkr: number;
+  next_available_slots: string[];
+  languages_spoken: string[];
+  rating: number;
+  echannelling_url: string;
+  doc990_url: string;
+  odoc_url: string;
+}
 
+export interface PartnerGatewayItem {
+  gateway_id: string;
+  name_en: string;
+  name_si: string;
+  description_en: string;
+  description_si: string;
+  portal_url: string;
+  hotline: string;
+}
 
+export interface SpecialistRecommendationResponse {
+  matched_specialty_code: string;
+  matched_specialty_en: string;
+  matched_specialty_si: string;
+  triage_acuity: string;
+  emergency_warning_active: boolean;
+  emergency_directive_en?: string | null;
+  emergency_directive_si?: string | null;
+  recommended_consultation_mode: string;
+  specialists: SpecialistDoctor[];
+  partner_gateways: PartnerGatewayItem[];
+}
+
+export interface AppointmentBookingRequestPayload {
+  doctor_id: string;
+  patient_name: string;
+  patient_phone: string;
+  patient_age?: number;
+  preferred_slot: string;
+  consultation_mode: string;
+  booking_gateway: string;
+  hospital_name?: string;
+  clinical_context_summary?: string;
+  recommended_specialty?: string;
+  triage_acuity?: string;
+  correlated_icd11_codes?: string[];
+  language?: string;
+}
+
+export interface AppointmentBookingResponse {
+  booking_id: string;
+  booking_reference: string;
+  status: string;
+  queue_token_number: number;
+  doctor: SpecialistDoctor;
+  patient_display_name: string;
+  patient_phone_masked: string;
+  scheduled_slot: string;
+  consultation_mode: string;
+  booking_gateway: string;
+  hospital_or_platform: string;
+  estimated_fee_lkr: number;
+  telemedicine_meeting_url?: string | null;
+  external_gateway_redirect_url: string;
+  sbar_clinical_handover_en: string;
+  sbar_clinical_handover_si: string;
+  created_at: string;
+}

@@ -12,7 +12,12 @@ import {
   StreamStatusData,
   PatientProfileItem,
   PatientMedicalRecordItem,
-  PatientTrendsResponse
+  PatientTrendsResponse,
+  SpecialistDoctor,
+  PartnerGatewayItem,
+  SpecialistRecommendationResponse,
+  AppointmentBookingRequestPayload,
+  AppointmentBookingResponse
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
@@ -568,5 +573,76 @@ export async function fetchPatientTrends(profileId: string): Promise<PatientTren
   return res.json();
 }
 
+// ---------------------------------------------------------------------------
+// Telemedicine & Specialist Doctor Appointment Booking API (eChannelling / Doc990 / oDoc)
+// ---------------------------------------------------------------------------
 
+export async function fetchBookingGateways(): Promise<PartnerGatewayItem[]> {
+  const res = await fetch(`${API_BASE}/telemedicine/gateways`);
+  if (!res.ok) throw new Error("Failed to fetch booking gateways");
+  return res.json();
+}
 
+export async function fetchSpecialistDoctors(params?: {
+  specialty?: string;
+  mode?: string;
+  gateway?: string;
+  q?: string;
+}): Promise<SpecialistDoctor[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.specialty && params.specialty !== "ALL") searchParams.set("specialty", params.specialty);
+  if (params?.mode && params.mode !== "ALL") searchParams.set("mode", params.mode);
+  if (params?.gateway && params.gateway !== "ALL") searchParams.set("gateway", params.gateway);
+  if (params?.q) searchParams.set("q", params.q);
+
+  const qs = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  const res = await fetch(`${API_BASE}/telemedicine/specialists${qs}`);
+  if (!res.ok) throw new Error("Failed to fetch specialist doctors");
+  return res.json();
+}
+
+export async function recommendSpecialistsForPatient(payload: {
+  specialty_hint?: string;
+  clinical_context?: string;
+  triage_acuity?: string;
+  icd11_codes?: string[];
+  consultation_mode?: string;
+  language?: string;
+}): Promise<SpecialistRecommendationResponse> {
+  const res = await fetch(`${API_BASE}/telemedicine/recommend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error("Failed to match specialist recommendations");
+  return res.json();
+}
+
+export async function bookSpecialistAppointment(
+  payload: AppointmentBookingRequestPayload
+): Promise<AppointmentBookingResponse> {
+  const res = await fetch(`${API_BASE}/telemedicine/appointments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ detail: "Booking failed" }));
+    throw new Error(errorData.detail || "Failed to book specialist appointment");
+  }
+  return res.json();
+}
+
+export async function fetchBookedAppointments(): Promise<AppointmentBookingResponse[]> {
+  const res = await fetch(`${API_BASE}/telemedicine/appointments`);
+  if (!res.ok) throw new Error("Failed to fetch booked appointments");
+  return res.json();
+}
+
+export async function cancelBookedAppointment(bookingId: string): Promise<AppointmentBookingResponse> {
+  const res = await fetch(`${API_BASE}/telemedicine/appointments/${encodeURIComponent(bookingId)}/cancel`, {
+    method: "PATCH"
+  });
+  if (!res.ok) throw new Error("Failed to cancel appointment");
+  return res.json();
+}

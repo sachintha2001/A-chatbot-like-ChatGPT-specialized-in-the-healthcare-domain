@@ -6,6 +6,7 @@ export interface Translations {
   appSubtitle: string;
   navTriage: string;
   navReports: string;
+  navTelemedicine: string;
   navRecords: string;
   navOntology: string;
   navRLHF: string;
@@ -108,6 +109,7 @@ export const translations: Record<Language, Translations> = {
     appSubtitle: "Clinical Decision Support & Patient Triage",
     navTriage: "Clinical Triage",
     navReports: "Lab Reports",
+    navTelemedicine: "Doctor Booking",
     navRecords: "Health Records (EHR)",
     navOntology: "ICD-11 Ontology",
     navRLHF: "Clinician RLHF Queue",
@@ -210,6 +212,7 @@ export const translations: Record<Language, Translations> = {
     appSubtitle: "සායනික තීරණ සහායක සහ රෝගී Triage පද්ධතිය",
     navTriage: "සායනික Triage",
     navReports: "වෛද්‍ය වාර්තා",
+    navTelemedicine: "වෛද්‍ය හමුවීම් (Booking)",
     navRecords: "සෞඛ්‍ය ඉතිහාසය (EHR)",
     navOntology: "ICD-11 නාමාවලිය",
     navRLHF: "වෛද්‍ය RLHF සමාලෝචනය",
