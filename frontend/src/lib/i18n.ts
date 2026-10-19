@@ -90,6 +90,16 @@ export interface Translations {
   vectorSimilarityLabel: string;
   cosineScoreLabel: string;
   viewSourceDocument: string;
+
+  // Voice STT & TTS
+  voiceInputTooltip: string;
+  voiceListening: string;
+  voiceStop: string;
+  voicePlay: string;
+  voiceStopAudio: string;
+  voiceAutoRead: string;
+  voicePermissionError: string;
+  voiceNotSupported: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -184,6 +194,16 @@ export const translations: Record<Language, Translations> = {
     vectorSimilarityLabel: "Semantic Vector Similarity",
     cosineScoreLabel: "Cosine Similarity Score",
     viewSourceDocument: "View Source Clinical Protocol",
+
+    // Voice STT & TTS
+    voiceInputTooltip: "Speak symptoms (Sinhala or English)",
+    voiceListening: "Listening... Speak clearly into your microphone",
+    voiceStop: "Stop listening",
+    voicePlay: "Read clinical response aloud",
+    voiceStopAudio: "Stop audio playback",
+    voiceAutoRead: "Auto Read Aloud",
+    voicePermissionError: "Microphone permission denied. Please allow microphone access in your browser.",
+    voiceNotSupported: "Speech recognition is not supported in this browser.",
   },
   si: {
     appTitle: "MedGuard AI",
@@ -276,5 +296,15 @@ export const translations: Record<Language, Translations> = {
     vectorSimilarityLabel: "දෛශික සමානතාවය",
     cosineScoreLabel: "සමානතා ලකුණු",
     viewSourceDocument: "මුල් සායනික ලේඛනය බලන්න",
+
+    // Voice STT & TTS
+    voiceInputTooltip: "කටහඬින් රෝග ලක්ෂණ කියන්න (සිංහල හෝ ඉංග්‍රීසි)",
+    voiceListening: "සවන් දෙමින් පවතී... මයික්‍රෆෝනයට පැහැදිලිව කතා කරන්න",
+    voiceStop: "හඬ පටිගත කිරීම නවත්වන්න",
+    voicePlay: "සායනික ප්‍රතිචාරය හඬින් අසන්න",
+    voiceStopAudio: "ශ්‍රව්‍ය ධාවනය නවත්වන්න",
+    voiceAutoRead: "ස්වයංක්‍රීයව හඬින් කියවීම",
+    voicePermissionError: "මයික්‍රෆෝනය භාවිතයට අවසර නැත. කරුණාකර ඔබගේ බ්‍රව්සරයෙන් අවසර ලබා දෙන්න.",
+    voiceNotSupported: "මෙම බ්‍රව්සරය මඟින් හඬ හඳුනාගැනීම සඳහා සහය නොදක්වයි.",
   },
 };

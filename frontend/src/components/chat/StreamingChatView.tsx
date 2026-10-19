@@ -13,7 +13,12 @@ import {
   Stethoscope,
   ChevronRight,
   PhoneCall,
-  Info
+  Info,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Radio
 } from "lucide-react";
 import {
   StreamCitation,
@@ -24,6 +29,11 @@ import {
 } from "@/lib/types";
 import { streamClinicalChat } from "@/lib/api";
 import { useLanguage } from "@/lib/LanguageContext";
+import {
+  clinicalVoicePlayer,
+  ClinicalSpeechRecognizer,
+  isSpeechRecognitionSupported
+} from "@/lib/voice";
 
 interface ChatMessage {
   id: string;
@@ -51,14 +61,112 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
   const [streamedChips, setStreamedChips] = useState<string[]>([]);
   const [activeCitationModal, setActiveCitationModal] = useState<StreamCitation | null>(null);
 
+  // Voice Engine States
+  const [autoReadAloud, setAutoReadAloud] = useState<boolean>(false);
+  const [activePlayingId, setActivePlayingId] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+  const recognizerRef = useRef<ClinicalSpeechRecognizer | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Stop voice and audio on unmount
+  useEffect(() => {
+    return () => {
+      recognizerRef.current?.stop();
+      clinicalVoicePlayer.stop();
+    };
+  }, []);
+
+  // Sync speech recognizer language when user switches language
+  useEffect(() => {
+    if (isListening && recognizerRef.current) {
+      recognizerRef.current.stop();
+      startVoiceListening();
+    }
+  }, [language]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamedText, activeStatus]);
 
+  const startVoiceListening = () => {
+    if (!isSpeechRecognitionSupported()) {
+      setVoiceNotice(t.voiceNotSupported);
+      setTimeout(() => setVoiceNotice(null), 4000);
+      return;
+    }
+
+    setVoiceNotice(t.voiceListening);
+    const recognizer = new ClinicalSpeechRecognizer({
+      language,
+      onResult: (transcript, isFinal) => {
+        if (isFinal) {
+          setInputText((prev) => (prev ? `${prev.trim()} ${transcript}` : transcript));
+        } else {
+          setVoiceNotice(`${t.voiceListening}: "${transcript}"`);
+        }
+      },
+      onError: (err) => {
+        setIsListening(false);
+        if (err === "not-allowed" || err === "permission-denied") {
+          setVoiceNotice(t.voicePermissionError);
+        } else {
+          setVoiceNotice(t.voicePermissionError);
+        }
+        setTimeout(() => setVoiceNotice(null), 5000);
+      },
+      onEnd: () => {
+        setIsListening(false);
+        setTimeout(() => setVoiceNotice(null), 1500);
+      }
+    });
+
+    const started = recognizer.start();
+    if (started) {
+      recognizerRef.current = recognizer;
+      setIsListening(true);
+    }
+  };
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      recognizerRef.current?.stop();
+      setIsListening(false);
+      setVoiceNotice(null);
+    } else {
+      startVoiceListening();
+    }
+  };
+
+  const handleToggleSpeak = (msgId: string, content: string) => {
+    if (activePlayingId === msgId) {
+      clinicalVoicePlayer.stop();
+      setActivePlayingId(null);
+    } else {
+      setActivePlayingId(msgId);
+      clinicalVoicePlayer.speak(msgId, content, language, {
+        onStart: () => setActivePlayingId(msgId),
+        onEnd: () => setActivePlayingId(null),
+        onError: () => setActivePlayingId(null)
+      });
+    }
+  };
+
+  const handleStopAllAudio = () => {
+    clinicalVoicePlayer.stop();
+    setActivePlayingId(null);
+  };
+
   const handleSend = async (messageToSend?: string) => {
+    // If voice recognition is listening, stop it when sending
+    if (isListening) {
+      recognizerRef.current?.stop();
+      setIsListening(false);
+      setVoiceNotice(null);
+    }
+
     const text = messageToSend || inputText;
     if (!text.trim() || isStreaming) return;
 
@@ -119,8 +227,9 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           setIsStreaming(false);
           setActiveStatus(null);
 
+          const assistantMsgId = `assistant-${Date.now()}`;
           const assistantMsg: ChatMessage = {
-            id: `assistant-${Date.now()}`,
+            id: assistantMsgId,
             sender: "CLINICIAN_ASSISTANT",
             content: accumulatedText,
             citations: finalCitations,
@@ -134,6 +243,13 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           setCurrentBadge(null);
           setStreamedCitations([]);
           setStreamedChips([]);
+
+          // Automatically speak clinical response if Auto Read Aloud is enabled
+          if (autoReadAloud && accumulatedText.trim()) {
+            setTimeout(() => {
+              handleToggleSpeak(assistantMsgId, accumulatedText);
+            }, 300);
+          }
         },
         onError: (err) => {
           setIsStreaming(false);
@@ -157,6 +273,11 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
   };
 
   const resetChat = () => {
+    clinicalVoicePlayer.stop();
+    recognizerRef.current?.stop();
+    setIsListening(false);
+    setActivePlayingId(null);
+    setVoiceNotice(null);
     setMessages([]);
     setStreamedText("");
     setCurrentBadge(null);
@@ -231,6 +352,30 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {activePlayingId && (
+            <button
+              onClick={handleStopAllAudio}
+              className="px-2.5 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors animate-pulse"
+              title={t.voiceStopAudio}
+            >
+              <VolumeX className="w-3.5 h-3.5" />
+              <span>{t.voiceStopAudio}</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setAutoReadAloud((prev) => !prev)}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors ${
+              autoReadAloud
+                ? "bg-teal-950/90 border-teal-600 text-teal-300"
+                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400"
+            }`}
+            title={t.voiceAutoRead}
+          >
+            <Volume2 className={`w-3.5 h-3.5 ${autoReadAloud ? "text-teal-400" : "text-slate-400"}`} />
+            <span>{t.voiceAutoRead}</span>
+          </button>
+
           {onOpenOntology && (
             <button
               onClick={onOpenOntology}
@@ -300,9 +445,34 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
             key={msg.id}
             className={`flex flex-col ${msg.sender === "PATIENT" ? "items-end" : "items-start"}`}
           >
-            <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-400">
+            <div className="flex items-center justify-between w-full max-w-[85%] mb-1 text-[11px] text-slate-400">
               <span>{msg.sender === "PATIENT" ? "Patient Narrative" : "Clinical Assessment"}</span>
-              <span>{msg.timestamp}</span>
+              <div className="flex items-center gap-2">
+                {msg.sender === "CLINICIAN_ASSISTANT" && (
+                  <button
+                    onClick={() => handleToggleSpeak(msg.id, msg.content)}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] transition-colors ${
+                      activePlayingId === msg.id
+                        ? "bg-teal-950 text-teal-300 border border-teal-700 animate-pulse"
+                        : "hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                    }`}
+                    title={activePlayingId === msg.id ? t.voiceStopAudio : t.voicePlay}
+                  >
+                    {activePlayingId === msg.id ? (
+                      <>
+                        <VolumeX className="w-3 h-3 text-teal-400" />
+                        <span>{t.voiceStopAudio}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-3 h-3 text-slate-400" />
+                        <span>{t.voicePlay}</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                <span>{msg.timestamp}</span>
+              </div>
             </div>
 
             <div
@@ -435,6 +605,13 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
 
       {/* Input Form Bar */}
       <div className="p-4 bg-slate-900 border-t border-slate-800 shrink-0">
+        {voiceNotice && (
+          <div className="mb-2.5 px-3 py-1.5 rounded bg-teal-950/80 border border-teal-700/60 text-teal-300 text-xs flex items-center gap-2">
+            <Radio className="w-3.5 h-3.5 animate-pulse text-teal-400 shrink-0" />
+            <span className="truncate">{voiceNotice}</span>
+          </div>
+        )}
+
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -442,15 +619,50 @@ export function StreamingChatView({ onOpenOntology }: StreamingChatViewProps) {
           }}
           className="flex items-center gap-2"
         >
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+          <div className="relative flex-1">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              disabled={isStreaming}
+              placeholder={
+                isListening
+                  ? t.voiceListening
+                  : "Type clinical symptoms, onset, character, or questions in English or Sinhala..."
+              }
+              className={`w-full bg-slate-950 border rounded-lg px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none transition-all disabled:opacity-50 ${
+                isListening
+                  ? "border-rose-500 ring-1 ring-rose-500/50 pr-24"
+                  : "border-slate-700 focus:border-teal-500"
+              }`}
+            />
+            {isListening && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[10px] text-rose-400 font-mono bg-rose-950/90 px-2 py-0.5 rounded border border-rose-800 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                REC {language === "si" ? "SI" : "EN"}
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleVoiceInput}
             disabled={isStreaming}
-            placeholder="Type clinical symptoms, onset, character, or questions in English or Sinhala..."
-            className="flex-1 bg-slate-950 border border-slate-700 focus:border-teal-500 rounded-lg px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none transition-colors disabled:opacity-50"
-          />
+            className={`p-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shrink-0 ${
+              isListening
+                ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-900/40 animate-pulse"
+                : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700 hover:border-slate-600"
+            }`}
+            title={isListening ? t.voiceStop : t.voiceInputTooltip}
+          >
+            {isListening ? (
+              <MicOff className="w-4 h-4 text-white" />
+            ) : (
+              <Mic className="w-4 h-4 text-teal-400" />
+            )}
+          </button>
+
           <button
             type="submit"
             disabled={!inputText.trim() || isStreaming}
